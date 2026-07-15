@@ -1,0 +1,36 @@
+{
+  "project": "Demo",
+  "plugins": [
+    {
+      "id": "library",
+      "title": "Block Library",
+      "environments": ["edit"],
+      "url": "https://main--demo--pstolmar.aem.live/docs/library",
+      "passConfig": true,
+      "passReferrer": true,
+      "isPalette": true
+    },
+    {
+      "id": "scheduler",
+      "title": "Scheduler",
+      "environments": ["dev", "preview"],
+      "event": "scheduler"
+    },
+    {
+      "id": "quick-edit",
+      "title": "Quick Edit",
+      "environments": ["dev", "preview"],
+      "event": "quick-edit"
+    },
+    {
+      "id": "open-in-ue",
+      "title": "Edit in Universal Editor",
+      "environments": ["dev", "preview", "live"],
+      "condition": {
+        "include": ["/tools/ue-spa-demo/"]
+      },
+      "url": "https://experience.adobe.com/#/aem/editor/canvas/{{liveUrl}}",
+      "isPalette": false
+    }
+  ]
+}
