@@ -61,8 +61,20 @@ function el(tag, attrs = {}, css = '') {
   return node;
 }
 
+function injectKeyframes() {
+  if (document.getElementById('sc-keyframes')) return;
+  const s = document.createElement('style');
+  s.id = 'sc-keyframes';
+  s.textContent = `@keyframes sc-chrnkv {
+    0%,100%{box-shadow:0 0 12px 4px #00CFFF,0 0 32px 8px #00CFFF}
+    50%{box-shadow:0 0 20px 8px #80F0FF,0 0 60px 20px #40D0FF}
+  }`;
+  document.head.append(s);
+}
+
 function startBlackout() {
   if (document.getElementById('sc-veil')) return;
+  injectKeyframes();
 
   const veil = el('div', { id: 'sc-veil' }, `
     position:fixed;inset:0;background:${DARK};opacity:0;
