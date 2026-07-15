@@ -84,7 +84,7 @@ function startBlackout() {
   requestAnimationFrame(() => { veil.style.opacity = '1'; });
 
   // Cherenkov glow on the scheme button
-  const schemBtn = document.querySelector('.action-wrapper.scheme button');
+  const schemBtn = document.querySelector('.action-wrapper.toggle button');
   if (schemBtn) {
     schemBtn.style.cssText += `
       box-shadow: 0 0 12px 4px ${CHERENKOV}, 0 0 32px 8px ${CHERENKOV};
@@ -119,7 +119,7 @@ function dropBulb(veil) {
 
 function goFullDark(veil) {
   // Remove cherenkov — total dark except a faint button glow
-  const schemBtn = document.querySelector('.action-wrapper.scheme button');
+  const schemBtn = document.querySelector('.action-wrapper.toggle button');
   if (schemBtn) schemBtn.style.boxShadow = `0 0 6px 2px ${CHERENKOV}`;
 
   setTimeout(() => dropFlashlight(veil), 1500);
@@ -275,7 +275,7 @@ function reviveLights(veil, robot, switchEl) {
   setTimeout(() => { veil.remove(); robot?.remove(); switchEl?.remove(); }, 900);
 
   // Restore scheme button
-  const schemBtn = document.querySelector('.action-wrapper.scheme button');
+  const schemBtn = document.querySelector('.action-wrapper.toggle button');
   if (schemBtn) schemBtn.style.cssText = schemBtn.style.cssText.replace(/box-shadow[^;]+;?/g, '').replace(/animation[^;]+;?/g, '');
 
   document.body.classList.add('light-scheme');
@@ -289,7 +289,7 @@ export default function init() {
   const params = new URLSearchParams(window.location.search);
   const active = params.has('stagecraft');
 
-  const findBtn = () => document.querySelector('.action-wrapper.scheme button');
+  const findBtn = () => document.querySelector('.action-wrapper.toggle button');
   const btn = findBtn();
   if (btn) {
     interceptSchemeButton(btn, active);
