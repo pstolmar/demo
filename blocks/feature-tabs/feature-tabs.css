@@ -1,0 +1,135 @@
+/* blocks/feature-tabs/feature-tabs.css */
+.feature-tabs {
+  --ft-purple: #3B1F5E;
+  --ft-green: #1A3D2B;
+  --ft-burgundy: #5C1A2A;
+  --ft-text: #fff;
+  --ft-active-bg: var(--ft-purple);
+  --ft-radius: 8px;
+  --ft-transition: 220ms ease-out;
+
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 0;
+  border-radius: var(--ft-radius);
+  overflow: hidden;
+  background: light-dark(#f5f5f5, #0d0d14);
+}
+
+.ft-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 6px;
+  background: light-dark(#e8e8e8, #15151f);
+  flex-wrap: wrap;
+}
+
+.ft-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: light-dark(#555, rgba(255 255 255 / 0.5));
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  overflow: hidden;
+  transition: color var(--ft-transition), background var(--ft-transition);
+}
+
+.ft-tab[aria-selected="true"] {
+  background: var(--ft-active-bg);
+  color: var(--ft-text);
+}
+
+/* Tab accent palette cycling for 4+ tabs */
+.ft-tab:nth-child(3n+1)[aria-selected="true"] { --ft-active-bg: var(--ft-purple); }
+.ft-tab:nth-child(3n+2)[aria-selected="true"] { --ft-active-bg: var(--ft-green); }
+.ft-tab:nth-child(3n+3)[aria-selected="true"] { --ft-active-bg: var(--ft-burgundy); }
+
+/* Highlight sweep effect */
+.ft-sweep {
+  position: absolute;
+  inset: 0;
+  background: rgba(255 255 255 / 0.15);
+  transform: translateX(-100%);
+  pointer-events: none;
+}
+
+.ft-sweep.play {
+  animation: ft-sweep-anim 0.35s ease-out forwards;
+}
+
+@keyframes ft-sweep-anim {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
+
+/* Lock icon */
+.ft-lock {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.ft-shackle {
+  transform-origin: 50% 100%;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform: translateY(-3px);
+}
+
+.ft-shackle.locked {
+  transform: translateY(0);
+}
+
+/* Progress bar */
+.ft-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: rgba(255 255 255 / 0.4);
+  width: 0;
+}
+
+.ft-tab[aria-selected="true"] .ft-progress {
+  animation: ft-progress-fill 5s linear forwards;
+}
+
+@keyframes ft-progress-fill {
+  from { width: 0; }
+  to   { width: 100%; }
+}
+
+/* Panels */
+.ft-panels { position: relative; }
+
+.ft-panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  padding: 32px;
+  opacity: 0;
+  transform: scale(0.97);
+  transition: opacity var(--ft-transition), transform var(--ft-transition);
+}
+
+.ft-panel:not([hidden]) {
+  opacity: 1;
+  transform: scale(1);
+  display: grid;
+}
+
+.ft-panel[hidden] { display: none; }
+
+.ft-media img, .ft-media video { width: 100%; border-radius: 6px; }
+
+.ft-content h3 { font-size: 1.4rem; margin-bottom: 12px; }
+
+@media (max-width: 768px) {
+  .ft-panel { grid-template-columns: 1fr; }
+}
