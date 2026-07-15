@@ -1,0 +1,21 @@
+.cf-quote-text {
+  font-size: 1.4rem;
+  font-style: italic;
+  border-left: 4px solid var(--link-color, #0066cc);
+  padding-left: 20px;
+  margin: 0 0 12px;
+}
+
+.cf-quote-meta {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 0.9rem;
+  color: var(--text-color-muted, #666);
+}
+
+.cf-quote-meta cite { font-style: normal; font-weight: 600; }
+
+.cf-quote-role { font-style: italic; }
+
+.cf-error { color: var(--color-red, #c0392b); padding: 12px; }
