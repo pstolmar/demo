@@ -223,3 +223,24 @@
     }
   }
 }
+
+.hero.color-blend {
+  --blend-x: 50%;
+  --blend-y: 50%;
+
+  .hero-background::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background: radial-gradient(
+      ellipse 80% 80% at var(--blend-x) var(--blend-y),
+      #1E0A2E 0%,
+      #0D2318 40%,
+      #2A0A12 100%
+    );
+    opacity: 0.82;
+    mix-blend-mode: multiply;
+    transition: opacity 0.3s;
+  }
+}
