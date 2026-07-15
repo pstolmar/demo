@@ -101,6 +101,7 @@ export default function decorate(block) {
     tabEls[current].setAttribute('aria-selected', 'true');
     tabEls[current].tabIndex = 0;
     panelEls[current].hidden = false;
+    if (!fromAuto) tabEls[current].focus();
 
     if (effect === 'highlight') {
       const sweep = tabEls[current].querySelector('.ft-sweep');
