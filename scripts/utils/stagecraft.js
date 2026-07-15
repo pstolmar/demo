@@ -5,6 +5,18 @@
 const DARK = '#060608';
 const CHERENKOV = '#00CFFF';
 
+let safetyTimer = null;
+
+// Escape hatch — cleans up all stagecraft DOM regardless of sequence state
+function forceRevive() {
+  clearTimeout(safetyTimer);
+  ['sc-veil', 'sc-bulb-wrap', 'sc-ft-wrap', 'sc-spot', 'sc-robot-wrap', 'sc-switch'].forEach((id) => {
+    document.getElementById(id)?.remove();
+  });
+  const schemBtn = document.querySelector('.action-wrapper.toggle button');
+  if (schemBtn) schemBtn.style.cssText = '';
+}
+
 // SVGs as template strings ─────────────────────────────────────────────────
 
 const BULB_SVG = `
@@ -75,6 +87,7 @@ function injectKeyframes() {
 function startBlackout() {
   if (document.getElementById('sc-veil')) return;
   injectKeyframes();
+  safetyTimer = setTimeout(forceRevive, 35000);
 
   const veil = el('div', { id: 'sc-veil' }, `
     position:fixed;inset:0;background:${DARK};opacity:0;
@@ -111,7 +124,9 @@ function dropBulb(veil) {
   document.body.append(wrap);
   requestAnimationFrame(() => requestAnimationFrame(() => { wrap.style.top = '60px'; }));
 
+  const autoBulb = setTimeout(() => { if (document.getElementById('sc-bulb-wrap')) wrap.click(); }, 3500);
   wrap.addEventListener('click', () => {
+    clearTimeout(autoBulb);
     wrap.remove();
     goFullDark(veil);
   }, { once: true });
@@ -151,7 +166,13 @@ function dropFlashlight(veil) {
   `);
   document.body.append(spot);
 
+  // Fade veil out so the spot's transparent hole shows actual page content
+  veil.style.transition = 'opacity 0.5s ease';
+  veil.style.opacity = '0';
+
+  const autoFt = setTimeout(() => { if (document.getElementById('sc-ft-wrap')) ftWrap.click(); }, 3000);
   ftWrap.addEventListener('click', () => {
+    clearTimeout(autoFt);
     shelf.remove();
     pickUpFlashlight(ftWrap, spot, veil);
   }, { once: true });
@@ -198,7 +219,7 @@ function pickUpFlashlight(ftWrap, spot, veil) {
   function batteryLoop(ts) {
     const dt = ts - lastBatteryFrame;
     lastBatteryFrame = ts;
-    battery = Math.max(0, battery - (dt / 1000) * 0.04);
+    battery = Math.max(0, battery - (dt / 1000) * 0.12);
 
     if (battery < 0.3 && !flickering) { flickering = true; }
     if (flickering) {
@@ -267,6 +288,7 @@ function walkRobotAndRevive(veil) {
 }
 
 function reviveLights(veil, robot, switchEl) {
+  clearTimeout(safetyTimer);
   const spot = document.getElementById('sc-spot');
   spot?.remove();
 
