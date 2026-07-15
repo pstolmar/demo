@@ -405,9 +405,9 @@ async function initScene(wrapper, quakes, config) {
         detail.style.maxHeight = isActive ? `${detail.scrollHeight}px` : '0';
       }
     });
-    // Scroll active item into view in the panel list
+    // Scroll active item into view (suppressed with no-scroll modifier)
     const activeItem = wrapper.querySelector('.quake-item.is-active');
-    if (activeItem) activeItem.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    if (activeItem && !config.noScroll) activeItem.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }
 
   // ─── Spin to quake (corrected formula + shortest-path normalization) ───
@@ -587,6 +587,7 @@ export default async function decorate(block) {
     const config = {
       height: blockConfig.height || '600',
       minMag: blockConfig.minMag ?? 1.0,
+      noScroll: block.classList.contains('no-scroll'),
       ...blockConfig,
     };
 
