@@ -1,0 +1,66 @@
+.pull-quote {
+  position: relative;
+  max-width: 800px;
+  margin: 48px auto;
+  padding: 40px 48px 40px 80px;
+  border-left: 4px solid var(--button-color, #800080);
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.8s ease, transform 0.8s ease;
+}
+
+.pull-quote.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.pull-quote-mark {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  font-size: 80px;
+  font-family: Georgia, 'Times New Roman', serif;
+  color: var(--button-color, #800080);
+  line-height: 1;
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+.pull-quote-figure {
+  margin: 0;
+}
+
+.pull-quote-text {
+  font-size: var(--heading-font-size-l);
+  font-style: italic;
+  line-height: 1.5;
+  color: var(--text-color);
+  margin: 0 0 16px;
+}
+
+.pull-quote-attribution {
+  font-size: var(--body-font-size-s);
+  color: var(--dark-color, #505050);
+  font-weight: 600;
+}
+
+.pull-quote-attribution::before {
+  content: '\2014\00a0';
+}
+
+@media (width < 900px) {
+  .pull-quote {
+    margin: 32px auto;
+    padding: 32px 24px 32px 56px;
+  }
+
+  .pull-quote-mark {
+    left: 8px;
+    font-size: 60px;
+    top: 12px;
+  }
+
+  .pull-quote-text {
+    font-size: var(--body-font-size-m);
+  }
+}

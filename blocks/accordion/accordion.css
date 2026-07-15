@@ -1,0 +1,68 @@
+.accordion-container {
+  background-color: var(--background-color);
+}
+
+.accordion details {
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.accordion details summary {
+  position: relative;
+  padding: 16px 48px 16px 24px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--text-color);
+  line-height: 1.4;
+  transition: background-color 0.2s;
+}
+
+.accordion details summary::-webkit-details-marker {
+  display: none;
+}
+
+.accordion details summary::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 20px;
+  transform: translateY(-50%) rotate(45deg);
+  width: 8px;
+  height: 8px;
+  border: 2px solid #666;
+  border-width: 0 2px 2px 0;
+  transition: transform 0.3s ease;
+}
+
+.accordion details[open] summary::after {
+  transform: translateY(-50%) rotate(-135deg);
+}
+
+.accordion details summary:hover {
+  background-color: #f5f5f5;
+}
+
+.accordion details .accordion-item-body {
+  padding: 0 30px 20px;
+  font-size: 16px;
+  color: var(--text-color);
+  line-height: 1.6;
+}
+
+.accordion details .accordion-item-body p {
+  margin: 0 0 12px;
+}
+
+.accordion details .accordion-item-body a:not(.button) {
+  color: var(--link-color);
+}
+
+.accordion details .accordion-item-body ul {
+  padding-left: 20px;
+  margin: 0 0 12px;
+}
+
+.accordion details .accordion-item-body li {
+  margin-bottom: 4px;
+}

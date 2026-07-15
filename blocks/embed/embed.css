@@ -1,0 +1,145 @@
+.embed {
+  width: unset;
+  text-align: center;
+  max-width: unset;
+  margin: 0 auto;
+}
+
+.embed > div {
+  display: flex;
+  justify-content: center;
+}
+
+/* Full-bleed DASH video background */
+.embed.embed-dash-video {
+  position: relative;
+  width: 100%;
+  height: 56.25vw;
+  max-height: 70vh;
+  overflow: hidden;
+  margin: 0;
+  max-width: unset;
+  background: #000;
+}
+
+.embed.embed-dash-video video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.embed-container .embed-wrapper {
+  max-width: unset;
+  padding: 0;
+}
+
+.embed-container:has(.embed-dash-video) {
+  padding: 0;
+  margin: 0;
+}
+
+/* Video overlay: position section default content over the DASH video */
+.section:has(.embed-dash-video) {
+  position: relative;
+}
+
+.section:has(.embed-dash-video) > .default-content-wrapper {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  padding: 40px 24px;
+  background: linear-gradient(to top, rgb(0 0 0 / 80%) 0%, rgb(0 0 0 / 40%) 60%, transparent 100%);
+  color: #fff;
+  max-width: unset;
+}
+
+.section:has(.embed-dash-video) > .default-content-wrapper h2 {
+  color: #fff;
+  font-size: clamp(24px, 4vw, 36px);
+  font-weight: 300;
+  line-height: 1.3;
+  margin: 0 0 12px;
+  max-width: 600px;
+}
+
+.section:has(.embed-dash-video) > .default-content-wrapper p {
+  color: rgb(255 255 255 / 85%);
+  font-size: 16px;
+  line-height: 1.6;
+  max-width: 600px;
+  margin: 0 0 12px;
+}
+
+.section:has(.embed-dash-video) > .default-content-wrapper a {
+  color: #fff;
+  text-decoration: none;
+  border-bottom: 2px solid #86bc25;
+  padding-bottom: 2px;
+  font-weight: 400;
+  transition: border-color 0.2s ease;
+}
+
+.section:has(.embed-dash-video) > .default-content-wrapper a:hover {
+  border-bottom-color: #fff;
+}
+
+@media (width >= 900px) {
+  .section:has(.embed-dash-video) > .default-content-wrapper {
+    padding: 60px 56px;
+  }
+}
+
+.embed.embed-twitter .twitter-tweet-rendered {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.embed .embed-placeholder {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  position: relative;
+}
+
+.embed .embed-placeholder > * {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  inset: 0;
+}
+
+.embed .embed-placeholder picture img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.embed .embed-placeholder-play button {
+  box-sizing: border-box;
+  position: relative;
+  display: block;
+  transform: scale(3);
+  width: 22px;
+  height: 22px;
+  border: 2px solid;
+  border-radius: 20px;
+  padding: 0;
+}
+
+.embed .embed-placeholder-play button::before {
+  content: "";
+  display: block;
+  box-sizing: border-box;
+  position: absolute;
+  width: 0;
+  height: 10px;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 6px solid;
+  top: 4px;
+  left: 7px;
+}
