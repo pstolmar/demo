@@ -22,14 +22,14 @@ async function getContent(url) {
   if (data) {
     // Generic: iterate top-level keys looking for { item: { body: { html } } }
     for (const val of Object.values(data)) {
-      const html = val?.item?.body?.html ?? val?.item?.text?.html ?? val?.item?.content?.html;
+      const html = val?.item?.body?.html ?? val?.item?.content?.html ?? val?.item?.richText?.html;
       if (html) return sanitiseHTML(html);
     }
     // List shape: { items: [{ body: { html } }] }
     for (const val of Object.values(data)) {
       const items = val?.items;
       if (Array.isArray(items) && items[0]) {
-        const html = items[0]?.body?.html ?? items[0]?.text?.html;
+        const html = items[0]?.body?.html ?? items[0]?.content?.html ?? items[0]?.richText?.html;
         if (html) return sanitiseHTML(html);
       }
     }
