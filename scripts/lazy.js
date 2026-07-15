@@ -19,4 +19,9 @@ async function loadSidekick() {
     import('../tools/scheduler/scheduler.js');
     loadSidekick();
   }
+
+  // Stagecraft easter egg (only loads if ?stagecraft param present)
+  if (new URLSearchParams(window.location.search).has('stagecraft')) {
+    import('./utils/stagecraft.js').then((m) => m.default());
+  }
 }());
