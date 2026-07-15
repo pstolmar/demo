@@ -101,9 +101,28 @@ The procedural m3d-globe texture is replaced with the **R3F globe approach** fro
 `earth_texture.jpg` (or the NASA blue marble CDN URL). When the texture fails to load, fall
 back gracefully to the procedural canvas texture already in the block.
 
-Additional quake-feed improvements:
-- Snap-to: when a quake is selected (click sidebar or map pin), smooth camera tween to lat/lon.
-- Bidirectional: hovering the globe pin highlights the sidebar row and vice versa.
+Additional quake-feed fixes and improvements:
+
+**Snap-to bug (confirmed):** `spinToQuake` computes `rawY = Math.PI / 2 - theta` but the
+correct formula is `rawY = theta - Math.PI / 2`. Camera is at `(0,0,2.5)`; world-Z of a point
+is maximised when `sin(θ − R) = 1`, i.e. `R = θ − π/2`. The current sign is negated → always
+lands 180° opposite (directly across the globe). One-line fix:
+```js
+const rawY = theta - Math.PI / 2; // was: Math.PI / 2 - theta
+```
+
+**Globe marker click → sidebar (missing accordion):** `setHighlight` is called correctly but
+only toggles an `.is-active` CSS class; the sidebar item doesn't visually expand. Users miss it.
+Fix: add accordion expand — `is-active` item gets `max-height` animated from `48px` → `auto`
+(use `max-height` transition + a `.quake-item-detail` inner div hidden by default). Also call
+`scrollIntoView({ block: 'center' })` instead of `'nearest'` so the active item centres in the
+panel, not just barely scrolls into view.
+
+**Globe texture:** swap procedural canvas texture for the NASA Blue Marble URL from r3f.html
+(`https://raw.githubusercontent.com/mrdoob/three.js/r160/examples/textures/land_ocean_ice_cloud_2048.jpg`).
+Load pattern: render procedural immediately, upgrade texture once image loads (same lazy-upgrade
+pattern already in r3f.html).
+
 - Sidebar virtualised (IntersectionObserver lazy rows) for 1000+ events.
 
 #### B3 · Block Library JSON updates
@@ -111,19 +130,46 @@ Additional quake-feed improvements:
 
 ---
 
-### C · SPAs
+### C · SPAs + CF Blocks (Modernised)
 
+#### C1 · SPA files
 Copy `~/dev/eds/diagram-editor/tools/ue-spa-demo/` → `tools/ue-spa-demo/` in demo repo.
 Files: `react-enterprise.html`, `svelte.html`, `nextjs.html`, `vue.html`, `angular.html`,
 `r3f.html`, `cf-spa.html`, `config.js`, `app.js`, `styles.css`.
 
-`config.js` updates:
-- AEM GraphQL endpoint already correct (`author-p138879-e1741192.adobeaemcloud.com`)
-- Add a DA Live fragment fetch alongside CF fetch (one `fetch` call to
-  `https://main--demo--pstolmar.aem.live/fragments/promos/main/default.json` surfaced as a
-  "Live Promotion" card in the React enterprise SPA sidebar).
+Update `config.js` to correct AEM GraphQL endpoint. AEM instance
+`author-p138879-e1741192.adobeaemcloud.com` is already correct; update GraphQL queries to
+use persisted-query paths (see C2).
 
 Sidekick plugin in `config.json` enables "Edit in Universal Editor" for `/tools/ue-spa-demo/` paths.
+
+#### C2 · Modern CF fetch pattern (replaces cfrenderer approach)
+
+The old `cfrenderer` block fetches `data.textBlockCfByPath.item.body.html` — a hardcoded single
+model/schema. All new CF-powered blocks use **modern AEM persisted queries** instead:
+
+```
+GET https://author-p138879-e1741192.adobeaemcloud.com/graphql/execute.json/{config}/{query-name}
+```
+
+Standard response envelope: `{ data: { contentFragmentByPath: { item: { ...fields } } } }` or
+`{ data: { contentFragmentList: { items: [ ... ] } } }`.
+
+**New CF EDS blocks** (each a thin wrapper that fetches a CF and renders it, no framework needed):
+
+| Block | What it fetches | Renders as |
+|---|---|---|
+| `cf-hero` | single CF (title, body, image) | hero section |
+| `cf-cards` | CF list query | card grid |
+| `cf-quote` | single CF (quote, author, role) | pull-quote |
+| `cf-stats` | CF list (label, value, trend) | metrics-grid row |
+
+Each block takes one authored cell: either a persisted query URL or a CF path. Generic field
+mapping via block modifier classes (e.g. `cf-cards compact`). Falls back to `cfrenderer` HTML
+rendering if the response contains an `html` field.
+
+All four SPAs (`react-enterprise`, `svelte`, `vue`, `angular`) updated to use persisted queries
+with these same query paths for consistency.
 
 ---
 
