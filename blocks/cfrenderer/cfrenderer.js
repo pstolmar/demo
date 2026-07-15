@@ -1,15 +1,14 @@
 function sanitiseHTML(htmlString) {
   if (!htmlString) return null;
-
-  // Initialize a new DOMParser instance
-  const parser = new DOMParser();
-
-  // Parse the HTML string
-  const doc = parser.parseFromString(htmlString, 'text/html');
-
-  // Remove any <script> tags to mitigate potential XSS attacks
-  Array.from(doc.getElementsByTagName('script')).forEach((script) => script.remove());
-
+  const doc = new DOMParser().parseFromString(htmlString, 'text/html');
+  doc.querySelectorAll('script,iframe,object,embed').forEach((el) => el.remove());
+  doc.querySelectorAll('*').forEach((el) => {
+    [...el.attributes].forEach((attr) => {
+      if (/^on/i.test(attr.name) || /^javascript:/i.test(attr.value)) {
+        el.removeAttribute(attr.name);
+      }
+    });
+  });
   return doc.body.childNodes;
 }
 async function getContent(url) {
