@@ -44,7 +44,12 @@ function decorateLanguage(btn) {
     if (!menu) {
       const content = document.createElement('div');
       content.classList.add('block-content');
-      const fragment = await loadFragment(`${locale.prefix}${HEADER_PATH}/languages`);
+      let fragment;
+      try {
+        fragment = await loadFragment(`${locale.prefix}${HEADER_PATH}/languages`);
+      } catch {
+        fragment = await loadFragment(`${HEADER_PATH}/languages`);
+      }
       menu = document.createElement('div');
       menu.className = 'language menu';
       menu.append(fragment);

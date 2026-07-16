@@ -12,7 +12,9 @@ export default async function decorate(block) {
     card.className = 'corkboard-card';
     card.setAttribute('role', 'listitem');
 
-    const img = cells[0] ? cells[0].querySelector('img, picture') : null;
+    const imgCell = cells.length > 1 ? cells[0] : null;
+    const bodyCell = cells.length > 1 ? cells[1] : cells[0];
+    const img = imgCell ? imgCell.querySelector('img, picture') : null;
     if (img) {
       const figure = document.createElement('figure');
       figure.className = 'corkboard-figure';
@@ -24,10 +26,10 @@ export default async function decorate(block) {
       card.append(figure);
     }
 
-    if (cells[1]) {
+    if (bodyCell) {
       const body = document.createElement('div');
       body.className = 'corkboard-body';
-      body.innerHTML = cells[1].innerHTML;
+      body.innerHTML = bodyCell.innerHTML;
       card.append(body);
     }
 

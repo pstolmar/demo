@@ -6,8 +6,9 @@
  *
  * Features:
  *  - Drag to rotate globe
- *  - Click/hover panel entry → spin globe to that quake + highlight node
- *  - Hover globe node → highlight panel entry
+ *  - Click globe marker → spin globe + highlight sidebar + floating tooltip
+ *  - Click sidebar entry → spin globe to marker + floating tooltip
+ *  - Tooltip tracks marker in 3D space during spin animation
  *  - Demo mode: 5s after load a surprise M8.2 quake appears, globe spins to it
  *  - Live mode: auto-cycles top→bottom of list, loops, picks up new quakes
  *  - Ripples loop continuously
@@ -15,13 +16,13 @@
  */
 
 const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js';
-const USGS_API = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.geojson';
+const USGS_API = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson';
 const GLOBE_RADIUS = 1;
 const POLL_INTERVAL = 60000;
 const RIPPLE_DURATION = 3000;
 const RIPPLE_COUNT = 3;
-const CYCLE_DELAY_MS = 5000; // pause before first auto-cycle step
-const CYCLE_PAUSE_MS = 4000; // pause on each quake during cycle
+const CYCLE_DELAY_MS = 5000;
+const CYCLE_PAUSE_MS = 4000;
 
 // ─── Magnitude helpers ───────────────────────────────────────────────────
 function getMagnitudeColor(mag) {
@@ -119,14 +120,20 @@ function createTerrainTexture(THREE) {
 }
 
 // ─── Parse block config ──────────────────────────────────────────────────
+// Rows are key/value pairs: first cell = key, second cell = value.
+// Must not iterate all divs or numeric height values get mistaken for minMag.
 function parseBlock(block) {
-  let cfg = {};
-  block.querySelectorAll('div').forEach((row) => {
-    const t = row.textContent.trim();
-    if (t.startsWith('{')) {
-      try { cfg = { ...cfg, ...JSON.parse(t) }; } catch { /* skip */ }
-    } else if (!Number.isNaN(parseFloat(t))) {
-      cfg.minMag = parseFloat(t);
+  const cfg = {};
+  block.querySelectorAll(':scope > div > div').forEach((row) => {
+    const cells = [...row.querySelectorAll(':scope > div')];
+    if (cells.length < 2) return;
+    const key = cells[0].textContent.trim().toLowerCase().replace(/[\s-]+/g, '');
+    const val = cells[1].textContent.trim();
+    if (!val) return;
+    if (key === 'height') { cfg.height = val; return; }
+    if (key === 'minmag') { cfg.minMag = parseFloat(val); return; }
+    if (val.startsWith('{')) {
+      try { Object.assign(cfg, JSON.parse(val)); } catch { /* skip */ }
     }
   });
   return cfg;
@@ -243,7 +250,6 @@ function renderLoadingSpinner() {
 }
 
 // ─── Side panel ──────────────────────────────────────────────────────────
-// newQuakeId: if set, that item gets 'quake-item-new' flash class
 function buildPanel(quakes, demo, newQuakeId = null) {
   const panel = document.createElement('div');
   panel.className = 'quake-panel';
@@ -282,24 +288,41 @@ function buildPanel(quakes, demo, newQuakeId = null) {
 }
 
 // ─── Main scene ──────────────────────────────────────────────────────────
-async function initScene(wrapper, quakes, config) {
+async function initScene(globeArea, wrapper, quakes, config) {
   const THREE = await loadThreeJS();
 
   const canvas = document.createElement('canvas');
   canvas.className = 'quake-canvas';
-  wrapper.append(canvas);
+  globeArea.append(canvas);
 
-  const w = wrapper.clientWidth || 700;
+  const w = globeArea.clientWidth || (wrapper.clientWidth - 320) || 700;
   const h = config.height ? parseInt(config.height, 10) : 600;
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(60, w / h, 0.1, 100);
-  camera.position.set(0, 0, 2.5);
+  const camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 100);
+  camera.position.set(0, 0, 2.1);
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
   renderer.setSize(w, h);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setClearColor(0x07080d, 1);
+
+  // Starfield
+  const starCount = 4000;
+  const starPos = new Float32Array(starCount * 3);
+  for (let i = 0; i < starCount; i += 1) {
+    const r = 50;
+    const phi = Math.acos(2 * Math.random() - 1);
+    const theta = 2 * Math.PI * Math.random();
+    starPos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+    starPos[i * 3 + 1] = r * Math.cos(phi);
+    starPos[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+  }
+  const starGeo = new THREE.BufferGeometry();
+  starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+  scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({
+    color: 0xffffff, size: 0.25, sizeAttenuation: true, transparent: true, opacity: 0.82,
+  })));
 
   // Globe group (rotated by drag and spin-to)
   const globeGroup = new THREE.Group();
@@ -324,15 +347,33 @@ async function initScene(wrapper, quakes, config) {
     () => { /* silently keep procedural on fail */ },
   );
 
-  const wfGeom = new THREE.IcosahedronGeometry(GLOBE_RADIUS + 0.002, 32);
-  globeGroup.add(new THREE.Mesh(wfGeom, new THREE.MeshBasicMaterial({
-    color: 0xffffff, wireframe: true, opacity: 0.08, transparent: true,
-  })));
+  // Wireframe overlay — very faint to avoid distracting triangle shapes
+  globeGroup.add(new THREE.Mesh(
+    new THREE.IcosahedronGeometry(GLOBE_RADIUS + 0.002, 32),
+    new THREE.MeshBasicMaterial({
+      color: 0xffffff, wireframe: true, opacity: 0.012, transparent: true,
+    }),
+  ));
 
-  const atmGeom = new THREE.IcosahedronGeometry(GLOBE_RADIUS + 0.04, 32);
-  globeGroup.add(new THREE.Mesh(atmGeom, new THREE.MeshBasicMaterial({
-    color: 0x38bdf8, opacity: 0.06, transparent: true,
-  })));
+  // Inner atmosphere haze
+  globeGroup.add(new THREE.Mesh(
+    new THREE.IcosahedronGeometry(GLOBE_RADIUS + 0.04, 32),
+    new THREE.MeshBasicMaterial({
+      color: 0x38bdf8, opacity: 0.06, transparent: true, depthWrite: false,
+    }),
+  ));
+
+  // Outer atmosphere glow — SphereGeometry avoids visible polygon edges at low subdivisions
+  globeGroup.add(new THREE.Mesh(
+    new THREE.SphereGeometry(GLOBE_RADIUS + 0.15, 64, 32),
+    new THREE.MeshBasicMaterial({
+      color: 0x1855ee,
+      opacity: 0.13,
+      transparent: true,
+      side: THREE.BackSide,
+      depthWrite: false,
+    }),
+  ));
 
   const pl = new THREE.PointLight(0xffffff, 0.8, 100);
   pl.position.set(2, 2, 2);
@@ -389,14 +430,13 @@ async function initScene(wrapper, quakes, config) {
   quakes.slice(0, 20).forEach(createNode);
 
   // ─── Highlight by quake ID ───
-  // Pass null to clear all highlights
-  function setHighlight(quakeId) {
+  // scroll=true only on direct user clicks — never during auto-cycle or hover
+  function setHighlight(quakeId, scroll = false) {
     nodeObjects.forEach((obj) => {
       const active = obj.quake.id === quakeId;
       obj.mat.color.setHex(active ? 0xffffff : obj.baseColor);
       obj.mesh.scale.setScalar(active ? 1.8 : 1);
     });
-    // Sync panel items via data-quake-id attribute
     wrapper.querySelectorAll('.quake-item').forEach((item) => {
       const isActive = item.dataset.quakeId === quakeId;
       item.classList.toggle('is-active', isActive);
@@ -405,19 +445,23 @@ async function initScene(wrapper, quakes, config) {
         detail.style.maxHeight = isActive ? `${detail.scrollHeight}px` : '0';
       }
     });
-    // Scroll active item into view (suppressed with no-scroll modifier)
-    const activeItem = wrapper.querySelector('.quake-item.is-active');
-    if (activeItem && !config.noScroll) activeItem.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    if (scroll && !config.noScroll) {
+      const activeItem = wrapper.querySelector('.quake-item.is-active');
+      const list = wrapper.querySelector('.quake-list');
+      if (activeItem && list) {
+        const targetTop = activeItem.offsetTop - (list.clientHeight - activeItem.offsetHeight) / 2;
+        list.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+      }
+    }
   }
 
-  // ─── Spin to quake (corrected formula + shortest-path normalization) ───
+  // ─── Spin to quake ───
   let targetY = 0; let targetX = 0; let spinning = false;
 
   function spinToQuake(quake) {
-    // theta = (lon + 180) * π/180; facing camera requires rotation.y = theta - π/2
+    // theta = (lon + 180) * π/180; facing camera requires rotation.y = π/2 - theta
     const theta = (quake.lon + 180) * (Math.PI / 180);
-    const rawY = theta - Math.PI / 2;
-    // Normalize to shortest angular path from current rotation
+    const rawY = Math.PI / 2 - theta;
     const curr = globeGroup.rotation.y;
     let diff = (rawY - curr) % (2 * Math.PI);
     if (diff > Math.PI) diff -= 2 * Math.PI;
@@ -425,6 +469,70 @@ async function initScene(wrapper, quakes, config) {
     targetY = curr + diff;
     targetX = -((quake.lat * Math.PI) / 180) * 0.4;
     spinning = true;
+  }
+
+  // ─── Floating tooltip ───
+  let tooltip = null;
+  let tooltipQuakeId = null;
+
+  function hideTooltip() {
+    if (tooltip) { tooltip.remove(); tooltip = null; tooltipQuakeId = null; }
+  }
+
+  function getMarkerScreenPos(nodeObj) {
+    const worldPos = nodeObj.pos.clone().applyMatrix4(globeGroup.matrixWorld);
+    // Only show tooltip when marker is on the camera-facing hemisphere
+    if (worldPos.z < 0) return null;
+    worldPos.project(camera);
+    const canvasW = canvas.clientWidth;
+    const canvasH = canvas.clientHeight;
+    return {
+      x: (worldPos.x * 0.5 + 0.5) * canvasW,
+      y: (-worldPos.y * 0.5 + 0.5) * canvasH,
+    };
+  }
+
+  function updateTooltipPosition() {
+    if (!tooltip || !tooltipQuakeId) return;
+    const obj = nodeObjects.find((o) => o.quake.id === tooltipQuakeId);
+    if (!obj) return;
+    const pos = getMarkerScreenPos(obj);
+    if (!pos) {
+      tooltip.style.visibility = 'hidden';
+      return;
+    }
+    tooltip.style.visibility = '';
+    tooltip.style.left = `${pos.x}px`;
+    tooltip.style.top = `${pos.y}px`;
+  }
+
+  function showTooltip(quake) {
+    hideTooltip();
+    const magFloor = Math.min(9, Math.floor(quake.mag));
+    tooltip = document.createElement('div');
+    tooltip.className = 'quake-tooltip';
+    tooltip.innerHTML = `
+      <div class="quake-tooltip-header">
+        <span class="quake-tooltip-mag m${magFloor}">M${quake.mag.toFixed(1)}</span>
+        <button class="quake-tooltip-close" aria-label="Close">✕</button>
+      </div>
+      <div class="quake-tooltip-place">${quake.place}</div>
+      <div class="quake-tooltip-meta">
+        <span>⬇ ${quake.depth} km depth</span>
+        <span>${timeAgo(quake.time)}</span>
+      </div>
+    `;
+    tooltipQuakeId = quake.id;
+    tooltip.querySelector('.quake-tooltip-close').addEventListener('click', (e) => {
+      e.stopPropagation();
+      hideTooltip();
+    });
+    globeArea.append(tooltip);
+    // Trigger transition after paint
+    requestAnimationFrame(() => {
+      updateTooltipPosition();
+      tooltip?.classList.add('is-visible');
+    });
   }
 
   // ─── Drag to rotate ───
@@ -441,6 +549,7 @@ async function initScene(wrapper, quakes, config) {
   canvas.addEventListener('mousedown', (e) => {
     dragging = true; lastX = e.clientX; lastY = e.clientY;
     autoSpin = false; spinning = false;
+    hideTooltip();
   });
   window.addEventListener('mousemove', (e) => {
     if (!dragging) return;
@@ -451,16 +560,16 @@ async function initScene(wrapper, quakes, config) {
   });
   window.addEventListener('mouseup', () => { if (dragging) { dragging = false; resumeAutoSpin(); } });
 
-  // Touch drag — passive:false only on touchmove so we can prevent page-scroll while dragging globe
   canvas.addEventListener('touchstart', (e) => {
     if (e.touches.length === 1) {
       dragging = true; lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
       autoSpin = false; spinning = false;
+      hideTooltip();
     }
   }, { passive: true });
   canvas.addEventListener('touchmove', (e) => {
     if (!dragging || e.touches.length !== 1) return;
-    e.preventDefault(); // prevent page scroll while rotating globe
+    e.preventDefault();
     const dx = e.touches[0].clientX - lastX; const dy = e.touches[0].clientY - lastY;
     globeGroup.rotation.y += dx * 0.005;
     globeGroup.rotation.x = Math.max(-0.8, Math.min(0.8, globeGroup.rotation.x + dy * 0.005));
@@ -493,12 +602,20 @@ async function initScene(wrapper, quakes, config) {
     if (quakeId) setHighlight(quakeId);
     canvas.style.cursor = quakeId ? 'pointer' : 'grab';
   });
+
   canvas.addEventListener('click', (e) => {
     const quakeId = getHoveredQuakeId(e);
     if (quakeId) {
       const q = nodeObjects.find((n) => n.quake.id === quakeId)?.quake;
-      setHighlight(quakeId);
-      if (q) { spinToQuake(q); autoSpin = false; resumeAutoSpin(); }
+      setHighlight(quakeId, true);
+      if (q) {
+        spinToQuake(q);
+        showTooltip(q);
+        autoSpin = false;
+        resumeAutoSpin();
+      }
+    } else {
+      hideTooltip();
     }
   });
   canvas.style.cursor = 'grab';
@@ -511,8 +628,9 @@ async function initScene(wrapper, quakes, config) {
       item.addEventListener('mouseenter', () => { if (quakeId) setHighlight(quakeId); });
       item.addEventListener('click', () => {
         if (q) {
-          setHighlight(quakeId);
+          setHighlight(quakeId, true);
           spinToQuake(q);
+          showTooltip(q);
           autoSpin = false;
           resumeAutoSpin();
         }
@@ -525,10 +643,8 @@ async function initScene(wrapper, quakes, config) {
     requestAnimationFrame(animate);
     const now = Date.now();
 
-    // Auto-spin when idle
     if (autoSpin && !dragging && !spinning) globeGroup.rotation.y += 0.0003;
 
-    // Lerp to target when spinning
     if (spinning) {
       globeGroup.rotation.y += (targetY - globeGroup.rotation.y) * 0.05;
       globeGroup.rotation.x += (targetX - globeGroup.rotation.x) * 0.05;
@@ -537,7 +653,9 @@ async function initScene(wrapper, quakes, config) {
       if (doneY && doneX) spinning = false;
     }
 
-    // Ripples — loop by resetting when expired
+    // Track tooltip position against globe rotation
+    updateTooltipPosition();
+
     activeRipples.forEach((item) => {
       const elapsed = now - item.startTime;
       const cycle = item.duration + 500;
@@ -558,23 +676,28 @@ async function initScene(wrapper, quakes, config) {
     renderer.render(scene, camera);
   }
 
-  window.addEventListener('resize', () => {
-    const nw = wrapper.clientWidth; const nh = wrapper.clientHeight;
+  // ResizeObserver fires on first observe (corrects initial flex-layout sizing)
+  // and on every subsequent resize — replaces the window resize listener
+  new ResizeObserver(() => {
+    const nw = globeArea.clientWidth;
+    const nh = globeArea.clientHeight;
     if (nw && nh) {
       camera.aspect = nw / nh;
       camera.updateProjectionMatrix();
       renderer.setSize(nw, nh);
     }
-  });
+  }).observe(globeArea);
 
   animate();
 
   return {
     addQuake: (q) => { createNode(q); },
     spinToQuake: (q) => spinToQuake(q),
-    setHighlight: (quakeId) => setHighlight(quakeId),
+    setHighlight: (quakeId, scroll) => setHighlight(quakeId, scroll),
     setAutoSpin: (val) => { autoSpin = val; },
     refreshPanel: () => attachPanelListeners(),
+    showTooltip: (q) => showTooltip(q),
+    hideTooltip: () => hideTooltip(),
     dispose: () => renderer.dispose(),
   };
 }
@@ -610,7 +733,7 @@ export default async function decorate(block) {
     }
 
     if (!quakes?.length) {
-      const msg = demo ? 'Demo data unavailable' : 'No earthquakes in the last hour';
+      const msg = demo ? 'Demo data unavailable' : 'No earthquakes found in the last 24 hours';
       renderEmpty(block, msg);
       return;
     }
@@ -620,18 +743,30 @@ export default async function decorate(block) {
     wrapper.className = 'quake-wrapper';
     block.append(wrapper);
 
-    const ctrl = await initScene(wrapper, quakes, config);
+    const globeArea = document.createElement('div');
+    globeArea.className = 'quake-globe-area';
+    wrapper.append(globeArea);
+
+    const panelArea = document.createElement('div');
+    panelArea.className = 'quake-panel-area';
+    wrapper.append(panelArea);
+
+    // Force sync layout so globeArea.clientWidth reflects flex computation
+    // eslint-disable-next-line no-unused-expressions
+    globeArea.offsetWidth;
+
+    const ctrl = await initScene(globeArea, wrapper, quakes, config);
 
     const replacePanel = (list, isDemo, newId = null) => {
-      const old = wrapper.querySelector('.quake-panel');
+      const old = panelArea.querySelector('.quake-panel');
       const next = buildPanel(list, isDemo, newId);
-      if (old) old.replaceWith(next); else wrapper.append(next);
+      if (old) old.replaceWith(next); else panelArea.append(next);
       ctrl.refreshPanel();
     };
 
     replacePanel(quakes, demo);
 
-    // ── Demo mode: cinematic surprise quake intro, then auto-spin ──────────
+    // ── Demo mode ──────────────────────────────────────────────────────────
     if (demo) {
       setTimeout(() => {
         const surprise = makeSurpriseQuake();
@@ -640,16 +775,17 @@ export default async function decorate(block) {
         replacePanel(quakes, true, surprise.id);
         ctrl.spinToQuake(surprise);
         ctrl.setHighlight(surprise.id);
-        // After pause, clear highlight and resume slow auto-spin
+        ctrl.showTooltip(surprise);
         setTimeout(() => {
           ctrl.setHighlight(null);
+          ctrl.hideTooltip();
           ctrl.setAutoSpin(true);
         }, CYCLE_PAUSE_MS);
       }, CYCLE_DELAY_MS);
       return;
     }
 
-    // ── Live mode: cycle top→bottom of panel list, loop ───────────────────
+    // ── Live mode ──────────────────────────────────────────────────────────
     let cycleIdx = 0;
     const getSorted = () => quakes.slice(0, 10).sort((a, b) => b.mag - a.mag);
 
@@ -659,10 +795,10 @@ export default async function decorate(block) {
       const q = sorted[cycleIdx % sorted.length];
       ctrl.spinToQuake(q);
       ctrl.setHighlight(q.id);
+      ctrl.showTooltip(q);
       cycleIdx += 1;
     };
 
-    // Delay start, then repeat every CYCLE_PAUSE_MS
     let cycleHandle = null;
     const scheduleCycle = () => {
       cycleHandle = setTimeout(() => {
@@ -692,7 +828,6 @@ export default async function decorate(block) {
       } catch { /* ignore poll errors */ }
     }, POLL_INTERVAL);
 
-    // Clean up cycle on page hide
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
         clearTimeout(cycleHandle);

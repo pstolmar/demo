@@ -1,0 +1,50 @@
+@import url('../card/card.css');
+
+/* ── Grid container ── */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1.5rem;
+  padding: 1.5rem 0;
+  align-items: start;
+}
+
+/* ── Per-card layout and interaction ── */
+.cards .card {
+  cursor: grab;
+  border-radius: 16px;
+  position: relative;
+  transition:
+    transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.25s ease,
+    opacity 0.2s ease;
+  will-change: transform;
+}
+
+/* Strong popout on hover — overrides card.css's mild scale(1.005) */
+.cards .card:not(.quiet):hover {
+  transform: translateY(-14px) scale(1.035);
+  box-shadow: 0 28px 64px rgb(0 0 0 / 22%);
+  z-index: 1;
+}
+
+/* ── Drag states ── */
+.cards .card.is-dragging {
+  opacity: 0.3;
+  transform: scale(0.95) rotate(-1.5deg);
+  cursor: grabbing;
+  z-index: 10;
+}
+
+/* Drop indicator lines on adjacent cards */
+.cards .card.drop-before {
+  box-shadow:
+    -5px 0 0 var(--color-accent, #6b00f5),
+    0 1px 6px 0 rgb(0 0 0 / 12%);
+}
+
+.cards .card.drop-after {
+  box-shadow:
+    5px 0 0 var(--color-accent, #6b00f5),
+    0 1px 6px 0 rgb(0 0 0 / 12%);
+}
