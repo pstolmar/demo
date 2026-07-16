@@ -288,14 +288,14 @@ function buildPanel(quakes, demo, newQuakeId = null) {
 }
 
 // ─── Main scene ──────────────────────────────────────────────────────────
-async function initScene(wrapper, quakes, config) {
+async function initScene(globeArea, wrapper, quakes, config) {
   const THREE = await loadThreeJS();
 
   const canvas = document.createElement('canvas');
   canvas.className = 'quake-canvas';
-  wrapper.append(canvas);
+  globeArea.append(canvas);
 
-  const w = wrapper.clientWidth || 700;
+  const w = globeArea.clientWidth || (wrapper.clientWidth - 320) || 700;
   const h = config.height ? parseInt(config.height, 10) : 600;
 
   const scene = new THREE.Scene();
@@ -430,7 +430,8 @@ async function initScene(wrapper, quakes, config) {
   quakes.slice(0, 20).forEach(createNode);
 
   // ─── Highlight by quake ID ───
-  function setHighlight(quakeId) {
+  // scroll=true only on direct user clicks — never during auto-cycle or hover
+  function setHighlight(quakeId, scroll = false) {
     nodeObjects.forEach((obj) => {
       const active = obj.quake.id === quakeId;
       obj.mat.color.setHex(active ? 0xffffff : obj.baseColor);
@@ -444,8 +445,14 @@ async function initScene(wrapper, quakes, config) {
         detail.style.maxHeight = isActive ? `${detail.scrollHeight}px` : '0';
       }
     });
-    const activeItem = wrapper.querySelector('.quake-item.is-active');
-    if (activeItem && !config.noScroll) activeItem.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    if (scroll && !config.noScroll) {
+      const activeItem = wrapper.querySelector('.quake-item.is-active');
+      const list = wrapper.querySelector('.quake-list');
+      if (activeItem && list) {
+        const targetTop = activeItem.offsetTop - (list.clientHeight - activeItem.offsetHeight) / 2;
+        list.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+      }
+    }
   }
 
   // ─── Spin to quake ───
@@ -520,7 +527,7 @@ async function initScene(wrapper, quakes, config) {
       e.stopPropagation();
       hideTooltip();
     });
-    wrapper.append(tooltip);
+    globeArea.append(tooltip);
     // Trigger transition after paint
     requestAnimationFrame(() => {
       updateTooltipPosition();
@@ -600,7 +607,7 @@ async function initScene(wrapper, quakes, config) {
     const quakeId = getHoveredQuakeId(e);
     if (quakeId) {
       const q = nodeObjects.find((n) => n.quake.id === quakeId)?.quake;
-      setHighlight(quakeId);
+      setHighlight(quakeId, true);
       if (q) {
         spinToQuake(q);
         showTooltip(q);
@@ -621,7 +628,7 @@ async function initScene(wrapper, quakes, config) {
       item.addEventListener('mouseenter', () => { if (quakeId) setHighlight(quakeId); });
       item.addEventListener('click', () => {
         if (q) {
-          setHighlight(quakeId);
+          setHighlight(quakeId, true);
           spinToQuake(q);
           showTooltip(q);
           autoSpin = false;
@@ -670,7 +677,7 @@ async function initScene(wrapper, quakes, config) {
   }
 
   window.addEventListener('resize', () => {
-    const nw = wrapper.clientWidth; const nh = wrapper.clientHeight;
+    const nw = globeArea.clientWidth; const nh = globeArea.clientHeight;
     if (nw && nh) {
       camera.aspect = nw / nh;
       camera.updateProjectionMatrix();
@@ -683,7 +690,7 @@ async function initScene(wrapper, quakes, config) {
   return {
     addQuake: (q) => { createNode(q); },
     spinToQuake: (q) => spinToQuake(q),
-    setHighlight: (quakeId) => setHighlight(quakeId),
+    setHighlight: (quakeId, scroll) => setHighlight(quakeId, scroll),
     setAutoSpin: (val) => { autoSpin = val; },
     refreshPanel: () => attachPanelListeners(),
     showTooltip: (q) => showTooltip(q),
@@ -733,12 +740,20 @@ export default async function decorate(block) {
     wrapper.className = 'quake-wrapper';
     block.append(wrapper);
 
-    const ctrl = await initScene(wrapper, quakes, config);
+    const globeArea = document.createElement('div');
+    globeArea.className = 'quake-globe-area';
+    wrapper.append(globeArea);
+
+    const panelArea = document.createElement('div');
+    panelArea.className = 'quake-panel-area';
+    wrapper.append(panelArea);
+
+    const ctrl = await initScene(globeArea, wrapper, quakes, config);
 
     const replacePanel = (list, isDemo, newId = null) => {
-      const old = wrapper.querySelector('.quake-panel');
+      const old = panelArea.querySelector('.quake-panel');
       const next = buildPanel(list, isDemo, newId);
-      if (old) old.replaceWith(next); else wrapper.append(next);
+      if (old) old.replaceWith(next); else panelArea.append(next);
       ctrl.refreshPanel();
     };
 
