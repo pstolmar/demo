@@ -676,14 +676,17 @@ async function initScene(globeArea, wrapper, quakes, config) {
     renderer.render(scene, camera);
   }
 
-  window.addEventListener('resize', () => {
-    const nw = globeArea.clientWidth; const nh = globeArea.clientHeight;
+  // ResizeObserver fires on first observe (corrects initial flex-layout sizing)
+  // and on every subsequent resize — replaces the window resize listener
+  new ResizeObserver(() => {
+    const nw = globeArea.clientWidth;
+    const nh = globeArea.clientHeight;
     if (nw && nh) {
       camera.aspect = nw / nh;
       camera.updateProjectionMatrix();
       renderer.setSize(nw, nh);
     }
-  });
+  }).observe(globeArea);
 
   animate();
 
