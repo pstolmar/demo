@@ -21,6 +21,7 @@ function closeAllMenus() {
 function docClose(e) {
   if (e.target.closest('header')) return;
   closeAllMenus();
+  document.removeEventListener('click', docClose);
 }
 
 function toggleMenu(menu) {
@@ -130,11 +131,13 @@ function decorateNavItem(li) {
   const link = li.querySelector(':scope > p > a');
   if (link) link.classList.add('main-nav-link');
   const menu = decorateMegaMenu(li) || decorateMenu(li);
-  if (!(menu || link)) return;
-  link.addEventListener('click', (e) => {
-    e.preventDefault();
-    toggleMenu(li);
-  });
+  if (!link) return;
+  if (menu) {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      toggleMenu(li);
+    });
+  }
 }
 
 function decorateBrandSection(section) {
