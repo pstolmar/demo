@@ -120,14 +120,20 @@ function createTerrainTexture(THREE) {
 }
 
 // ─── Parse block config ──────────────────────────────────────────────────
+// Rows are key/value pairs: first cell = key, second cell = value.
+// Must not iterate all divs or numeric height values get mistaken for minMag.
 function parseBlock(block) {
-  let cfg = {};
-  block.querySelectorAll('div').forEach((row) => {
-    const t = row.textContent.trim();
-    if (t.startsWith('{')) {
-      try { cfg = { ...cfg, ...JSON.parse(t) }; } catch { /* skip */ }
-    } else if (!Number.isNaN(parseFloat(t))) {
-      cfg.minMag = parseFloat(t);
+  const cfg = {};
+  block.querySelectorAll(':scope > div > div').forEach((row) => {
+    const cells = [...row.querySelectorAll(':scope > div')];
+    if (cells.length < 2) return;
+    const key = cells[0].textContent.trim().toLowerCase().replace(/[\s-]+/g, '');
+    const val = cells[1].textContent.trim();
+    if (!val) return;
+    if (key === 'height') { cfg.height = val; return; }
+    if (key === 'minmag') { cfg.minMag = parseFloat(val); return; }
+    if (val.startsWith('{')) {
+      try { Object.assign(cfg, JSON.parse(val)); } catch { /* skip */ }
     }
   });
   return cfg;
