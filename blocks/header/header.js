@@ -21,6 +21,7 @@ function closeAllMenus() {
 function docClose(e) {
   if (e.target.closest('header')) return;
   closeAllMenus();
+  document.removeEventListener('click', docClose);
 }
 
 function toggleMenu(menu) {
