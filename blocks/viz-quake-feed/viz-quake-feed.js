@@ -299,8 +299,8 @@ async function initScene(wrapper, quakes, config) {
   const h = config.height ? parseInt(config.height, 10) : 600;
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(60, w / h, 0.1, 100);
-  camera.position.set(0, 0, 2.5);
+  const camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 100);
+  camera.position.set(0, 0, 2.1);
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
   renderer.setSize(w, h);
@@ -308,7 +308,7 @@ async function initScene(wrapper, quakes, config) {
   renderer.setClearColor(0x07080d, 1);
 
   // Starfield
-  const starCount = 2500;
+  const starCount = 4000;
   const starPos = new Float32Array(starCount * 3);
   for (let i = 0; i < starCount; i += 1) {
     const r = 50;
@@ -321,7 +321,7 @@ async function initScene(wrapper, quakes, config) {
   const starGeo = new THREE.BufferGeometry();
   starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
   scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({
-    color: 0xffffff, size: 0.18, sizeAttenuation: true, transparent: true, opacity: 0.65,
+    color: 0xffffff, size: 0.25, sizeAttenuation: true, transparent: true, opacity: 0.82,
   })));
 
   // Globe group (rotated by drag and spin-to)
@@ -347,11 +347,11 @@ async function initScene(wrapper, quakes, config) {
     () => { /* silently keep procedural on fail */ },
   );
 
-  // Wireframe overlay
+  // Wireframe overlay — very faint to avoid distracting triangle shapes
   globeGroup.add(new THREE.Mesh(
     new THREE.IcosahedronGeometry(GLOBE_RADIUS + 0.002, 32),
     new THREE.MeshBasicMaterial({
-      color: 0xffffff, wireframe: true, opacity: 0.06, transparent: true,
+      color: 0xffffff, wireframe: true, opacity: 0.012, transparent: true,
     }),
   ));
 
@@ -363,12 +363,12 @@ async function initScene(wrapper, quakes, config) {
     }),
   ));
 
-  // Outer atmosphere glow (BackSide creates a rim-light halo around the globe)
+  // Outer atmosphere glow — SphereGeometry avoids visible polygon edges at low subdivisions
   globeGroup.add(new THREE.Mesh(
-    new THREE.IcosahedronGeometry(GLOBE_RADIUS + 0.2, 16),
+    new THREE.SphereGeometry(GLOBE_RADIUS + 0.15, 64, 32),
     new THREE.MeshBasicMaterial({
       color: 0x1855ee,
-      opacity: 0.12,
+      opacity: 0.13,
       transparent: true,
       side: THREE.BackSide,
       depthWrite: false,
@@ -452,9 +452,9 @@ async function initScene(wrapper, quakes, config) {
   let targetY = 0; let targetX = 0; let spinning = false;
 
   function spinToQuake(quake) {
-    // theta = (lon + 180) * π/180; facing camera requires rotation.y = theta - π/2
+    // theta = (lon + 180) * π/180; facing camera requires rotation.y = π/2 - theta
     const theta = (quake.lon + 180) * (Math.PI / 180);
-    const rawY = theta - Math.PI / 2;
+    const rawY = Math.PI / 2 - theta;
     const curr = globeGroup.rotation.y;
     let diff = (rawY - curr) % (2 * Math.PI);
     if (diff > Math.PI) diff -= 2 * Math.PI;
