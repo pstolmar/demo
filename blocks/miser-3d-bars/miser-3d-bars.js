@@ -111,9 +111,6 @@ export default async function decorate(block) {
     barsData = parseBarsCsv(DEFAULT_BARS);
     gridData = null;
   }
-  // eslint-disable-next-line no-console
-  console.log('[bars-debug]', { tableData: tableData.length, barsData: barsData?.length, isGrid });
-
   blockRows.forEach((r) => r.remove());
 
   // DOM structure

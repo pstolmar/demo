@@ -111,8 +111,6 @@ export default async function decorate(block) {
   block.appendChild(tooltip);
 
   const points = parseCsv(csvText);
-  // eslint-disable-next-line no-console
-  console.log('[scatter-debug]', { csvLen: csvText.length, pointCount: points.length, csvStart: csvText.substring(0, 80) });
   if (!points.length) return;
 
   await loadScript(THREE_URL);
