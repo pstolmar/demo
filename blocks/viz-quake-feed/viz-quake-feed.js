@@ -748,6 +748,10 @@ export default async function decorate(block) {
     panelArea.className = 'quake-panel-area';
     wrapper.append(panelArea);
 
+    // Force sync layout so globeArea.clientWidth reflects flex computation
+    // eslint-disable-next-line no-unused-expressions
+    globeArea.offsetWidth;
+
     const ctrl = await initScene(globeArea, wrapper, quakes, config);
 
     const replacePanel = (list, isDemo, newId = null) => {

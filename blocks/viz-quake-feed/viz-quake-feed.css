@@ -59,6 +59,7 @@
 /* ── Canvas ── */
 .quake-canvas {
   display: block;
+  width: 100%;
 }
 
 .quake-wrapper {
