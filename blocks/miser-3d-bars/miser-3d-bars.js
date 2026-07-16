@@ -52,12 +52,6 @@ function heatColor(THREE, t) {
   return new THREE.Color(lo[1]).lerp(new THREE.Color(hi[1]), localT);
 }
 
-function readRowValue(row) {
-  if (!row) return '';
-  const cells = [...row.children];
-  return cells.length > 1 ? cells[1].textContent.trim() : row.textContent.trim();
-}
-
 function parseBarsCsv(text) {
   const lines = text.trim().split(/\r?\n/).filter(Boolean);
   const firstNum = parseFloat((lines[0] || '').split(',')[1]);
@@ -80,16 +74,43 @@ function parseGridCsv(text) {
 
 export default async function decorate(block) {
   const blockRows = [...block.children];
-  const variant = (readRowValue(blockRows[0]) || 'bars').toLowerCase();
-  const heightRaw = readRowValue(blockRows[1]) || '420';
-  const csvRaw = readRowValue(blockRows[2]);
+  let variant = 'bars';
+  let heightPx = 420;
+  const tableData = [];
+  let csvText = '';
+
+  blockRows.forEach((row) => {
+    const cells = [...row.children];
+    if (!cells.length) return;
+    const k = cells[0].textContent.trim().toLowerCase();
+    const v = cells.length > 1 ? cells[1].textContent.trim() : '';
+    if (k === 'variant') { variant = v.toLowerCase(); return; }
+    if (k === 'height') { heightPx = Math.max(200, parseInt(v, 10) || heightPx); return; }
+    // Skip header rows (label/category | value)
+    if ((k === 'label' || k === 'category') && (v.toLowerCase() === 'value' || v.toLowerCase() === 'color')) return;
+    if (cells.length === 1) {
+      const txt = cells[0].textContent.trim();
+      if (txt) csvText += (csvText ? '\n' : '') + txt;
+    } else {
+      const val = parseFloat(v);
+      if (!Number.isNaN(val)) {
+        tableData.push({
+          category: cells[0].textContent.trim(),
+          value: val,
+          color: cells.length > 2 ? cells[2].textContent.trim() : '',
+        });
+      }
+    }
+  });
 
   const isGrid = variant === 'grid';
-  const heightPx = Math.max(200, parseInt(heightRaw, 10) || 420);
-  const csvText = csvRaw || (isGrid ? DEFAULT_GRID : DEFAULT_BARS);
-
-  const barsData = isGrid ? null : parseBarsCsv(csvText);
-  const gridData = isGrid ? parseGridCsv(csvText) : null;
+  const csvToUse = csvText || (isGrid ? DEFAULT_GRID : DEFAULT_BARS);
+  let barsData = isGrid ? null : (tableData.length ? tableData : parseBarsCsv(csvToUse));
+  let gridData = isGrid ? parseGridCsv(csvToUse) : null;
+  if (!barsData?.length && !gridData?.length) {
+    barsData = parseBarsCsv(DEFAULT_BARS);
+    gridData = null;
+  }
 
   blockRows.forEach((r) => r.remove());
 

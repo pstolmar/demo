@@ -9,17 +9,26 @@ const AXIS_COLOR = 0x94a3b8;
 
 function parseCsv(text) {
   const lines = text.trim().split(/\r?\n/).filter(Boolean);
-  if (lines.length < 2) return [];
-  return lines.slice(1).map((line) => {
-    const parts = line.split(',').map((s) => s.trim());
+  if (!lines.length) return [];
+  const first = lines[0].split(',').map((s) => s.trim().toLowerCase());
+  const hasHeader = first.some((c) => ['x', 'y', 'z', 'label'].includes(c));
+  const xi = hasHeader ? first.indexOf('x') : 0;
+  const yi = hasHeader ? first.indexOf('y') : 1;
+  const zi = hasHeader ? first.indexOf('z') : 2;
+  const liFound = hasHeader ? first.indexOf('label') : -1;
+  const ci = hasHeader ? first.indexOf('color') : -1;
+  const dataLines = hasHeader ? lines.slice(1) : lines;
+  return dataLines.map((line) => {
+    const p = line.split(',').map((s) => s.trim());
+    const labelIdx = liFound >= 0 ? liFound : p.length - 1;
     return {
-      label: parts[0] || '',
-      x: parseFloat(parts[1]),
-      y: parseFloat(parts[2]),
-      z: parseFloat(parts[3]),
-      color: parts[4] || DEFAULT_COLOR,
+      label: p[labelIdx] || '',
+      x: parseFloat(p[xi >= 0 ? xi : 0]),
+      y: parseFloat(p[yi >= 0 ? yi : 1]),
+      z: parseFloat(p[zi >= 0 ? zi : 2]),
+      color: ci >= 0 && p[ci] ? p[ci] : DEFAULT_COLOR,
     };
-  }).filter((p) => !Number.isNaN(p.x) && !Number.isNaN(p.y) && !Number.isNaN(p.z));
+  }).filter((d) => !Number.isNaN(d.x) && !Number.isNaN(d.y) && !Number.isNaN(d.z));
 }
 
 function getRange(vals) {
@@ -83,8 +92,10 @@ export default async function decorate(block) {
     } else if (key === 'height') {
       height = parseFloat(val) || DEFAULT_HEIGHT;
     } else {
-      const rowText = row.textContent.trim();
-      if (rowText) csvText += (csvText ? '\n' : '') + rowText;
+      const rowCsv = cells.length > 1
+        ? cells.map((c) => c.textContent.trim()).join(',')
+        : cells[0].textContent.trim();
+      if (rowCsv) csvText += (csvText ? '\n' : '') + rowCsv;
     }
   });
 
