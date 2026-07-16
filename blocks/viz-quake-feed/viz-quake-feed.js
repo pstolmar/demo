@@ -15,7 +15,7 @@
  */
 
 const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js';
-const USGS_API = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.geojson';
+const USGS_API = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson';
 const GLOBE_RADIUS = 1;
 const POLL_INTERVAL = 60000;
 const RIPPLE_DURATION = 3000;
