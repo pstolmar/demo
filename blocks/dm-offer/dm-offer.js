@@ -19,9 +19,10 @@ function formatDate(iso) {
 }
 
 function buildDmUrl(template, values) {
+  const clampedPercent = Math.min(99, Math.max(1, parseInt(values.percent, 10) || 30));
   const pairs = [
     ['$hidebackground', values.hidebackground ? '1' : '0'],
-    ['$percent', String(values.percent)],
+    ['$percent', String(clampedPercent)],
     ['$image', values.image],
     ['$category', values.category],
     ['$enddate', formatDate(values.enddate)],
@@ -32,7 +33,8 @@ function buildDmUrl(template, values) {
     ['fmt', 'png-alpha'],
   ];
   const qs = pairs.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
-  return `${template}?${qs}`;
+  const base = template.split('?')[0];
+  return `${base}?${qs}`;
 }
 
 function readValues(form) {
@@ -85,21 +87,26 @@ export default function decorate(block) {
   form.className = 'dm-offer-controls';
   form.innerHTML = `
     <label>Discount %
-      <input type="number" name="percent" min="1" max="99" value="${defaults.percent}" />
+      <input type="number" name="percent" min="1" max="99" value="" />
     </label>
     <label>Category
-      <input type="text" name="category" value="${defaults.category}" />
+      <input type="text" name="category" value="" />
     </label>
     <label>End Date
-      <input type="date" name="enddate" value="${defaults.enddate}" />
+      <input type="date" name="enddate" value="" />
     </label>
     <label class="dm-offer-toggle">Hide Background
-      <input type="checkbox" name="hidebackground" ${defaults.hidebackground ? 'checked' : ''} />
+      <input type="checkbox" name="hidebackground" />
     </label>
     <label>Image Path
-      <input type="text" name="image" value="${defaults.image}" />
+      <input type="text" name="image" value="" />
     </label>
   `;
+  form.querySelector('[name="percent"]').value = defaults.percent;
+  form.querySelector('[name="category"]').value = defaults.category;
+  form.querySelector('[name="enddate"]').value = defaults.enddate;
+  form.querySelector('[name="hidebackground"]').checked = defaults.hidebackground;
+  form.querySelector('[name="image"]').value = defaults.image;
 
   const urlRow = document.createElement('div');
   urlRow.className = 'dm-offer-url-row';
