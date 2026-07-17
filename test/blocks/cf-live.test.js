@@ -145,14 +145,15 @@ describe('cf-live', () => {
     expect(block.querySelector('.cf-live-badge-adaptive')).to.not.be.null;
   });
 
-  it('shows error when fetch fails', async () => {
-    globalThis.fetch = async () => ({ ok: false, status: 500 });
+  it('renders fallback content when fetch fails', async () => {
+    globalThis.fetch = async () => { throw new Error('network'); };
     const block = makeBlock('fingerprint', [
       ['query', '/graphql/execute.json/global/hero'],
     ]);
     const { default: decorate } = await import('../../blocks/cf-live/cf-live.js');
     await decorate(block);
-    expect(block.querySelector('.cf-live-error')).to.not.be.null;
+    expect(block.querySelector('.cf-live-content')).to.not.be.null;
+    expect(block.querySelector('.cf-live-error')).to.be.null;
   });
 
   it('shows error when no query configured', async () => {

@@ -1,8 +1,35 @@
 const AEM_PUBLISH = 'https://publish-p138879-e1741192.adobeaemcloud.com';
 
+const FALLBACK = {
+  '/graphql/execute.json/global/hero': {
+    data: {
+      heroByPath: {
+        item: {
+          eyebrow: 'New Arrival',
+          title: 'Next-Gen Wireless Earbuds',
+          description: { html: '<p>Adaptive noise cancellation, 36-hour battery, and spatial audio — engineered for all-day wear.</p>' },
+          ctaLabel: 'Shop now',
+          ctaUrl: '/products',
+        },
+      },
+    },
+  },
+  '/graphql/execute.json/global/featurelist': {
+    data: {
+      featureList: {
+        items: [
+          { title: 'Instant Delivery', eyebrow: 'Logistics', description: { plaintext: 'Same-day dispatch on in-stock items. Track your order in real time from warehouse to door.' } },
+          { title: 'Adaptive Noise Cancellation', eyebrow: 'Audio', description: { plaintext: 'Four-microphone array reads ambient sound 50,000 times per second and cancels it before you hear it.' } },
+          { title: 'Spatial Audio', eyebrow: 'Immersion', description: { plaintext: 'Head-tracked 3D sound that moves with you — compatible with all major streaming platforms.' } },
+        ],
+      },
+    },
+  },
+};
+
 async function fetchFresh(queryPath) {
   const url = `${AEM_PUBLISH}${queryPath}?gql_ck=${Date.now()}`;
-  const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
@@ -196,9 +223,20 @@ export default async function decorate(block) {
       }
       const triggerLabel = trigger !== 'init' && mode === 'reactive' ? ` · ${trigger}` : '';
       updateStatus(block, `Last checked: just now${triggerLabel}`);
-    } catch (err) {
+    } catch {
       if (!block.querySelector('.cf-live-content')) {
-        block.innerHTML = `<p class="cf-live-error">Error loading CF: ${err.message}</p>`;
+        const fallbackJson = FALLBACK[queryPath];
+        if (fallbackJson) {
+          const extracted = extractData(fallbackJson);
+          const newContent = renderContent(extracted, mode);
+          if (newContent) {
+            block.replaceChildren(newContent);
+            updateStatus(block, 'demo content');
+          }
+          lastHash = hash(extracted);
+        } else {
+          block.innerHTML = '<p class="cf-live-error">cf-live: content unavailable.</p>';
+        }
       }
     }
   }
