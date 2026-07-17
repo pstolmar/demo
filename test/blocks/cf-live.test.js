@@ -19,10 +19,10 @@ function makeBlock(mode, rows = []) {
 function heroJson(eyebrow = 'Sale', title = 'Big Deal', html = '<p>Body</p>', ctaLabel = 'Shop') {
   return {
     data: {
-      heroList: {
-        items: [{ eyebrow, title, description: { html }, ctaLabel, ctaUrl: '/shop' }]
-      }
-    }
+      heroByPath: {
+        item: { eyebrow, title, description: { html }, ctaLabel, ctaUrl: '/shop' },
+      },
+    },
   };
 }
 
@@ -35,9 +35,9 @@ function featureJson(n = 2) {
           title: `Feature ${i}`,
           description: { plaintext: `Body ${i}` },
           _path: `/content/dam/feat/${i}`,
-        }))
-      }
-    }
+        })),
+      },
+    },
   };
 }
 
@@ -45,8 +45,50 @@ function featureJson(n = 2) {
 
 describe('cf-live', () => {
   let origFetch;
-  beforeEach(() => { origFetch = globalThis.fetch; });
-  afterEach(() => { globalThis.fetch = origFetch; document.body.innerHTML = ''; });
+  let addedListeners;
+  let timerIds;
+
+  beforeEach(() => {
+    origFetch = globalThis.fetch;
+    addedListeners = [];
+    timerIds = [];
+
+    const origAddEL = document.addEventListener.bind(document);
+    document.addEventListener = (type, handler, opts) => {
+      addedListeners.push({ type, handler });
+      origAddEL(type, handler, opts);
+    };
+
+    const origSetInterval = globalThis.setInterval.bind(globalThis);
+    globalThis.setInterval = (fn, delay, ...args) => {
+      const id = origSetInterval(fn, delay, ...args);
+      timerIds.push({ type: 'interval', id });
+      return id;
+    };
+
+    const origSetTimeout = globalThis.setTimeout.bind(globalThis);
+    globalThis.setTimeout = (fn, delay, ...args) => {
+      const id = origSetTimeout(fn, delay, ...args);
+      timerIds.push({ type: 'timeout', id });
+      return id;
+    };
+  });
+
+  afterEach(() => {
+    globalThis.fetch = origFetch;
+    document.addEventListener = EventTarget.prototype.addEventListener;
+
+    addedListeners.forEach(({ type, handler }) => {
+      document.removeEventListener(type, handler);
+    });
+
+    timerIds.forEach(({ type, id }) => {
+      if (type === 'interval') clearInterval(id);
+      else clearTimeout(id);
+    });
+
+    document.body.innerHTML = '';
+  });
 
   it('fingerprint mode renders promo content with badge', async () => {
     globalThis.fetch = async () => ({ ok: true, json: async () => heroJson() });

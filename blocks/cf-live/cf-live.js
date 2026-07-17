@@ -26,11 +26,8 @@ function extractData(json) {
   const data = json?.data;
   if (!data) return null;
   for (const val of Object.values(data)) {
-    if (Array.isArray(val?.items)) {
-      if (val.items.length === 1) return { type: 'single', item: val.items[0] };
-      return { type: 'list', items: val.items };
-    }
     if (val?.item) return { type: 'single', item: val.item };
+    if (Array.isArray(val?.items)) return { type: 'list', items: val.items };
     if (Array.isArray(val)) return { type: 'list', items: val };
   }
   return null;
