@@ -186,7 +186,7 @@ export default async function decorate(block) {
         return;
       }
 
-      if (trigger === 'init' || mode === 'reactive' || h !== lastHash) {
+      if (trigger === 'init' || h !== lastHash) {
         const newContent = renderContent(extracted, mode);
         if (newContent) {
           block.replaceChildren(newContent);
@@ -207,22 +207,29 @@ export default async function decorate(block) {
 
   if (mode === 'fingerprint') {
     let lastCheckedAt = Date.now();
-    setInterval(async () => {
+    const pollId = setInterval(async () => {
       await refresh('interval');
       lastCheckedAt = Date.now();
     }, pollSecs * 1000);
-    setInterval(() => {
+    const countdownId = setInterval(() => {
       const ago = Math.floor((Date.now() - lastCheckedAt) / 1000);
       const next = Math.max(0, pollSecs - ago);
       updateStatus(block, `Last checked: ${ago}s ago · Next in ${next}s`);
     }, 1000);
+    // eslint-disable-next-line no-underscore-dangle
+    block._dmIntervals = [pollId, countdownId];
   }
 
   if (mode === 'reactive') {
+    const controller = new AbortController();
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') refresh('tab focus');
-    });
-    setInterval(() => refresh('interval'), pollSecs * 1000);
+    }, { signal: controller.signal });
+    const tickId = setInterval(() => refresh('interval'), pollSecs * 1000);
+    // eslint-disable-next-line no-underscore-dangle
+    block._dmController = controller;
+    // eslint-disable-next-line no-underscore-dangle
+    block._dmIntervals = [tickId];
   }
 
   if (mode === 'compare') {
@@ -247,8 +254,9 @@ export default async function decorate(block) {
 
   if (mode === 'adaptive') {
     let currentInterval = pollSecs * 1000;
+    let timeoutId;
     const scheduleNext = () => {
-      setTimeout(async () => {
+      timeoutId = setTimeout(async () => {
         const prevHash = lastHash;
         await refresh('interval');
         currentInterval = lastHash !== prevHash
@@ -257,6 +265,8 @@ export default async function decorate(block) {
         updateStatus(block, `interval: ${currentInterval / 1000}s`);
         scheduleNext();
       }, currentInterval);
+      // eslint-disable-next-line no-underscore-dangle
+      block._dmTimeout = timeoutId;
     };
     scheduleNext();
   }

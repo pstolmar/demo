@@ -36,17 +36,19 @@ describe('dm-background', () => {
     const block = makeBlock('https://s7d1.scene7.com/is/image/Co/img');
     const { default: decorate } = await import('../../blocks/dm-background/dm-background.js');
     decorate(block);
-    const src = block.querySelector('img').src;
+    const { src } = block.querySelector('img');
     expect(src).to.include('wid=1920');
+    expect(src).to.include('hei=1080');
     expect(src).to.include('fmt=webp');
     expect(src).to.include('fit=crop');
+    expect(src).to.include('qlt=75');
   });
 
   it('respects custom fit param', async () => {
     const block = makeBlock('https://s7d1.scene7.com/is/image/Co/img', 'constrain');
     const { default: decorate } = await import('../../blocks/dm-background/dm-background.js');
     decorate(block);
-    const src = block.querySelector('img').src;
+    const { src } = block.querySelector('img');
     expect(src).to.include('fit=constrain');
   });
 
@@ -70,5 +72,12 @@ describe('dm-background', () => {
     const { default: decorate } = await import('../../blocks/dm-background/dm-background.js');
     decorate(block);
     expect(block.querySelector('img').getAttribute('aria-hidden')).to.equal('true');
+  });
+
+  it('does not throw and renders nothing when src is empty', async () => {
+    const block = makeBlock('');
+    const { default: decorate } = await import('../../blocks/dm-background/dm-background.js');
+    expect(() => decorate(block)).to.not.throw();
+    expect(block.querySelector('img')).to.be.null;
   });
 });
