@@ -271,10 +271,18 @@ function buildPanel(quakes, demo, newQuakeId = null) {
         <button class="quake-cycle-btn" aria-label="Pause auto-cycle" title="Pause/resume auto-cycle">⏸</button>
       </div>
     </div>
-    <div class="quake-list"></div>
+    <div class="quake-list-wrap">
+      <button class="quake-scroll-btn quake-scroll-up" aria-label="Scroll up" hidden>▲</button>
+      <div class="quake-list"></div>
+      <button class="quake-scroll-btn quake-scroll-down" aria-label="Scroll down">▼</button>
+    </div>
   `;
   const list = panel.querySelector('.quake-list');
-  const sorted = quakes.slice(0, 10).sort((a, b) => b.mag - a.mag);
+  const upBtn = panel.querySelector('.quake-scroll-up');
+  const downBtn = panel.querySelector('.quake-scroll-down');
+
+  // Sort ALL quakes by magnitude descending, then show top 15
+  const sorted = [...quakes].sort((a, b) => b.mag - a.mag).slice(0, 15);
   sorted.forEach((q) => {
     const item = document.createElement('div');
     item.className = 'quake-item';
@@ -303,6 +311,18 @@ function buildPanel(quakes, demo, newQuakeId = null) {
     `;
     list.append(item);
   });
+
+  // Scroll-arrow visibility: update on scroll, click arrows to scroll
+  const updateScrollBtns = () => {
+    upBtn.hidden = list.scrollTop <= 0;
+    downBtn.hidden = list.scrollTop >= list.scrollHeight - list.clientHeight - 2;
+  };
+  list.addEventListener('scroll', updateScrollBtns);
+  upBtn.addEventListener('click', () => list.scrollBy({ top: -160, behavior: 'smooth' }));
+  downBtn.addEventListener('click', () => list.scrollBy({ top: 160, behavior: 'smooth' }));
+  // Initial check after layout settles
+  requestAnimationFrame(updateScrollBtns);
+
   return panel;
 }
 
@@ -400,15 +420,17 @@ async function initScene(globeArea, wrapper, quakes, config) {
   scene.add(new THREE.AmbientLight(0x4a4a5e, 0.6));
 
   // ─── lat/lon → 3D point ───
-  // Matches Three.js IcosahedronGeometry UV: u = 0.5 + atan2(z, x)/(2π)
-  // so Prime Meridian (lon=0°) sits at +x, 90°E at +z, 90°W at -z.
+  // Three.js IcosahedronGeometry UV: u = 0.5 + atan2(z, -x)/(2π).
+  // For the NASA texture (u = (lon+180)/360), this requires:
+  //   atan2(z, -x) = lon*π/180
+  // → x = -sin(phi)*cos(lonRad), z = sin(phi)*sin(lonRad)
   function latLonToPoint(lat, lon, r = GLOBE_RADIUS) {
     const phi = (90 - lat) * (Math.PI / 180);
-    const theta = (lon + 180) * (Math.PI / 180);
+    const lonRad = lon * (Math.PI / 180);
     return new THREE.Vector3(
-      -r * Math.sin(phi) * Math.cos(theta),
+      -r * Math.sin(phi) * Math.cos(lonRad),
       r * Math.cos(phi),
-      -r * Math.sin(phi) * Math.sin(theta),
+      r * Math.sin(phi) * Math.sin(lonRad),
     );
   }
 
@@ -457,7 +479,7 @@ async function initScene(globeArea, wrapper, quakes, config) {
     });
   }
 
-  quakes.slice(0, 20).forEach(createNode);
+  quakes.forEach(createNode);
 
   // ─── Highlight by quake ID ───
   // scroll=true only on direct user clicks — never during auto-cycle or hover
@@ -505,9 +527,9 @@ async function initScene(globeArea, wrapper, quakes, config) {
   let targetY = 0; let targetX = 0; let spinning = false;
 
   function spinToQuake(quake) {
-    const theta = (quake.lon + 180) * (Math.PI / 180);
-    // rawY = theta + π/2 derived from z-flipped latLonToPoint: sin(rotY - theta) = 1
-    const rawY = theta + Math.PI / 2;
+    const lonRad = quake.lon * (Math.PI / 180);
+    // rawY = π/2 - lonRad derived from sin(rotY + lonRad) = 1 (marker faces +z camera)
+    const rawY = Math.PI / 2 - lonRad;
     const curr = globeGroup.rotation.y;
     let diff = (rawY - curr) % (2 * Math.PI);
     if (diff > Math.PI) diff -= 2 * Math.PI;
@@ -823,7 +845,7 @@ export default async function decorate(block) {
     let cycleUserPauseTimer = null;
     let cyclePaused = false;
 
-    const getSorted = () => quakes.slice(0, 10).sort((a, b) => b.mag - a.mag);
+    const getSorted = () => [...quakes].sort((a, b) => b.mag - a.mag).slice(0, 15);
 
     const doCycle = () => {
       if (ctrl.isHovering() || cyclePaused) return;
