@@ -15,6 +15,8 @@
  *  - Pause/resume button in panel header
  *  - Ripples only for the focused quake (mag ≥ 3)
  *  - Shows "● Live USGS" or "◈ Demo" in panel header
+ *
+ * v5 — fix spinToQuake X-tilt offset
  */
 
 const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js';
@@ -527,16 +529,24 @@ async function initScene(globeArea, wrapper, quakes, config) {
   let targetY = 0; let targetX = 0; let spinning = false;
 
   function spinToQuake(quake) {
+    const phi = (90 - quake.lat) * (Math.PI / 180);
     const lonRad = quake.lon * (Math.PI / 180);
-    // rawY = π/2 - lonRad derived from sin(rotY + lonRad) = 1 (marker faces +z camera)
-    const rawY = Math.PI / 2 - lonRad;
+    // Marker local coords (must match latLonToPoint)
+    const xLocal = -Math.sin(phi) * Math.cos(lonRad);
+    const yLocal = Math.cos(phi);
+    const zLocal = Math.sin(phi) * Math.sin(lonRad);
+    // Target X tilt
+    const rx = Math.max(-0.55, Math.min(0.55, -(quake.lat * Math.PI / 180) * 0.6));
+    // z-component after X-rotation: needed to find Y that centers the marker
+    const zPrime = yLocal * Math.sin(rx) + zLocal * Math.cos(rx);
+    // rawY = atan2(xLocal, -zPrime) + π → x_world=0, z_world>0
+    const rawY = Math.atan2(xLocal, -zPrime) + Math.PI;
     const curr = globeGroup.rotation.y;
     let diff = (rawY - curr) % (2 * Math.PI);
     if (diff > Math.PI) diff -= 2 * Math.PI;
     if (diff < -Math.PI) diff += 2 * Math.PI;
     targetY = curr + diff;
-    // Cap tilt so the marker stays clearly in frame at high latitudes
-    targetX = Math.max(-0.55, Math.min(0.55, -((quake.lat * Math.PI) / 180) * 0.6));
+    targetX = rx;
     spinning = true;
   }
 
