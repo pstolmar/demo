@@ -67,10 +67,11 @@
   width: 100%;
 }
 
+/* Globe area: overflow visible so tooltip isn't clipped above */
 .quake-globe-area {
   flex: 1;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .quake-panel-area {
@@ -155,11 +156,12 @@
 }
 
 .quake-panel-header {
-  padding: 1rem;
+  padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--vqf-panel-border);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 0.5rem;
 }
 
 .quake-panel-title {
@@ -168,6 +170,13 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--vqf-accent);
+  flex: 1;
+}
+
+.quake-panel-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .quake-status {
@@ -185,6 +194,24 @@
   color: #22c55e;
 }
 
+/* Pause/resume button */
+.quake-cycle-btn {
+  background: rgb(255 255 255 / 6%);
+  border: 1px solid var(--vqf-panel-border);
+  border-radius: 4px;
+  color: var(--vqf-text-dim);
+  cursor: pointer;
+  font-size: 0.7rem;
+  line-height: 1;
+  padding: 0.25rem 0.4rem;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.quake-cycle-btn:hover {
+  background: rgb(255 255 255 / 12%);
+  color: var(--vqf-text);
+}
+
 /* ── Quake List ── */
 .quake-list {
   flex: 1;
@@ -192,14 +219,13 @@
   padding: 0.5rem 0;
 }
 
+/* ── Quake Item — column layout for accordion ── */
 .quake-item {
-  padding: 0.75rem 1rem;
   border-bottom: 1px solid rgb(255 255 255 / 4%);
-  display: flex;
-  gap: 0.75rem;
-  align-items: flex-start;
   cursor: pointer;
   transition: background-color 0.2s ease;
+  display: flex;
+  flex-direction: column;
 }
 
 .quake-item:hover {
@@ -209,6 +235,18 @@
 .quake-item.is-active {
   background-color: rgb(56 189 248 / 8%);
   border-left: 2px solid var(--vqf-accent);
+}
+
+/* Top row: badge + info side by side */
+.quake-item-main {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.75rem 1rem;
+}
+
+.quake-item.is-active .quake-item-main {
+  padding-left: calc(1rem - 2px); /* compensate for the active border */
 }
 
 /* New-quake flash animation for demo surprise entry */
@@ -309,24 +347,37 @@
   background: rgb(255 255 255 / 20%);
 }
 
-/* ── Accordion Detail ── */
+/* ── Accordion Detail — full-width block below the main row ── */
 .quake-item-detail {
   max-height: 0;
   overflow: hidden;
-  transition: max-height 0.25s ease;
-  padding: 0 12px;
+  transition: max-height 0.28s ease, padding 0.28s ease;
+  padding: 0 1rem;
   font-size: 0.75rem;
-  color: rgba(255 255 255 / 0.55);
+  color: rgb(200 207 224 / 65%);
+  font-family: var(--vqf-font-mono);
 }
 
 .quake-item.is-active .quake-item-detail {
-  padding-bottom: 8px;
+  border-top: 1px solid rgb(56 189 248 / 15%);
+  padding-bottom: 0.75rem;
+  padding-top: 0.5rem;
 }
 
 .quake-detail-row {
   display: flex;
   justify-content: space-between;
   padding: 2px 0;
+  gap: 0.5rem;
+}
+
+.quake-detail-row span:first-child {
+  color: var(--vqf-text-dim);
+  flex-shrink: 0;
+}
+
+.quake-detail-row span:last-child {
+  text-align: right;
 }
 
 /* ── Floating Tooltip ── */
@@ -334,8 +385,8 @@
   position: absolute;
   z-index: 8;
   pointer-events: auto;
-  width: 220px;
-  background: rgb(5 7 18 / 92%);
+  width: 230px;
+  background: rgb(5 7 18 / 94%);
   border: 1px solid var(--vqf-accent);
   border-radius: 10px;
   padding: 0.75rem 1rem;
@@ -355,7 +406,7 @@
   left: 50%;
   width: 12px;
   height: 12px;
-  background: rgb(5 7 18 / 92%);
+  background: rgb(5 7 18 / 94%);
   border-right: 1px solid var(--vqf-accent);
   border-bottom: 1px solid var(--vqf-accent);
   transform: translateX(-50%) rotate(45deg);
@@ -369,7 +420,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.4rem;
 }
 
 .quake-tooltip-mag {
@@ -412,7 +463,7 @@
   font-size: 0.8rem;
   font-weight: 500;
   line-height: 1.3;
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.35rem;
 }
 
 .quake-tooltip-meta {
@@ -421,6 +472,14 @@
   font-size: 0.7rem;
   color: var(--vqf-text-dim);
   font-family: var(--vqf-font-mono);
+  margin-bottom: 0.2rem;
+}
+
+.quake-tooltip-coords {
+  font-size: 0.68rem;
+  color: rgb(200 207 224 / 40%);
+  font-family: var(--vqf-font-mono);
+  letter-spacing: 0.02em;
 }
 
 /* ── Responsive ── */

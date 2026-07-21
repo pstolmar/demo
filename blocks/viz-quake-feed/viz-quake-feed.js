@@ -11,7 +11,9 @@
  *  - Tooltip tracks marker in 3D space during spin animation
  *  - Demo mode: 5s after load a surprise M8.2 quake appears, globe spins to it
  *  - Live mode: auto-cycles top→bottom of list, loops, picks up new quakes
- *  - Ripples loop continuously
+ *  - Hover over globe or sidebar pauses the auto-cycle
+ *  - Pause/resume button in panel header
+ *  - Ripples only for the focused quake (mag ≥ 3)
  *  - Shows "● Live USGS" or "◈ Demo" in panel header
  */
 
@@ -23,6 +25,7 @@ const RIPPLE_DURATION = 3000;
 const RIPPLE_COUNT = 3;
 const CYCLE_DELAY_MS = 5000;
 const CYCLE_PAUSE_MS = 4000;
+const RIPPLE_MIN_MAG = 3;
 
 // ─── Magnitude helpers ───────────────────────────────────────────────────
 function getMagnitudeColor(mag) {
@@ -120,11 +123,15 @@ function createTerrainTexture(THREE) {
 }
 
 // ─── Parse block config ──────────────────────────────────────────────────
-// Rows are key/value pairs: first cell = key, second cell = value.
-// Must not iterate all divs or numeric height values get mistaken for minMag.
+// Handles both DA Live (block > row > cell) and UE (block > wrapper > row > cell)
 function parseBlock(block) {
   const cfg = {};
-  block.querySelectorAll(':scope > div > div').forEach((row) => {
+  // Detect which nesting level has key/value row pairs
+  let rows = [...block.querySelectorAll(':scope > div > div')];
+  if (!rows.some((r) => r.querySelectorAll(':scope > div').length >= 2)) {
+    rows = [...block.querySelectorAll(':scope > div')];
+  }
+  rows.forEach((row) => {
     const cells = [...row.querySelectorAll(':scope > div')];
     if (cells.length < 2) return;
     const key = cells[0].textContent.trim().toLowerCase().replace(/[\s-]+/g, '');
@@ -256,7 +263,10 @@ function buildPanel(quakes, demo, newQuakeId = null) {
   panel.innerHTML = `
     <div class="quake-panel-header">
       <div class="quake-panel-title">Recent Earthquakes</div>
-      <div class="quake-status ${demo ? 'demo' : 'live'}">${demo ? '◈ Demo' : '● Live USGS'}</div>
+      <div class="quake-panel-controls">
+        <div class="quake-status ${demo ? 'demo' : 'live'}">${demo ? '◈ Demo' : '● Live USGS'}</div>
+        <button class="quake-cycle-btn" aria-label="Pause auto-cycle" title="Pause/resume auto-cycle">⏸</button>
+      </div>
     </div>
     <div class="quake-list"></div>
   `;
@@ -271,15 +281,21 @@ function buildPanel(quakes, demo, newQuakeId = null) {
     if (q.mag >= 6) cls = 'badge-red';
     else if (q.mag >= 4) cls = 'badge-amber';
     else if (q.mag >= 2) cls = 'badge-green';
+    const latStr = `${Math.abs(q.lat).toFixed(2)}°${q.lat >= 0 ? 'N' : 'S'}`;
+    const lonStr = `${Math.abs(q.lon).toFixed(2)}°${q.lon >= 0 ? 'E' : 'W'}`;
+    const localTime = new Date(q.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     item.innerHTML = `
-      <div class="quake-badge ${cls}">${q.mag.toFixed(1)}</div>
-      <div class="quake-info">
-        <div class="quake-place">${q.place}</div>
-        <div class="quake-time">${timeAgo(q.time)}</div>
+      <div class="quake-item-main">
+        <div class="quake-badge ${cls}">${q.mag.toFixed(1)}</div>
+        <div class="quake-info">
+          <div class="quake-place">${q.place}</div>
+          <div class="quake-time">${timeAgo(q.time)}</div>
+        </div>
       </div>
       <div class="quake-item-detail" aria-hidden="true">
         <div class="quake-detail-row"><span>Depth</span><span>${q.depth} km</span></div>
-        <div class="quake-detail-row"><span>Coords</span><span>${q.lat.toFixed(2)}°, ${q.lon.toFixed(2)}°</span></div>
+        <div class="quake-detail-row"><span>Location</span><span>${latStr}, ${lonStr}</span></div>
+        <div class="quake-detail-row"><span>Time</span><span>${localTime}</span></div>
       </div>
     `;
     list.append(item);
@@ -363,7 +379,7 @@ async function initScene(globeArea, wrapper, quakes, config) {
     }),
   ));
 
-  // Outer atmosphere glow — SphereGeometry avoids visible polygon edges at low subdivisions
+  // Outer atmosphere glow
   globeGroup.add(new THREE.Mesh(
     new THREE.SphereGeometry(GLOBE_RADIUS + 0.15, 64, 32),
     new THREE.MeshBasicMaterial({
@@ -395,7 +411,17 @@ async function initScene(globeArea, wrapper, quakes, config) {
   const nodeObjects = []; // { mesh, mat, quake, pos, baseColor }
   const activeRipples = [];
 
+  function clearRipples() {
+    activeRipples.forEach((item) => {
+      globeGroup.remove(item.ring);
+      item.ring.geometry.dispose();
+      item.rMat.dispose();
+    });
+    activeRipples.length = 0;
+  }
+
   function spawnRipples(pos, color) {
+    clearRipples();
     const now = Date.now();
     for (let i = 0; i < RIPPLE_COUNT; i += 1) {
       const delay = (i * RIPPLE_DURATION) / RIPPLE_COUNT;
@@ -421,7 +447,6 @@ async function initScene(globeArea, wrapper, quakes, config) {
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.copy(pos);
     globeGroup.add(mesh);
-    spawnRipples(latLonToPoint(quake.lat, quake.lon, GLOBE_RADIUS + 0.001), color);
     nodeObjects.push({
       mesh, mat, quake, pos, baseColor: color,
     });
@@ -432,17 +457,33 @@ async function initScene(globeArea, wrapper, quakes, config) {
   // ─── Highlight by quake ID ───
   // scroll=true only on direct user clicks — never during auto-cycle or hover
   function setHighlight(quakeId, scroll = false) {
+    let activeQuake = null;
     nodeObjects.forEach((obj) => {
       const active = obj.quake.id === quakeId;
       obj.mat.color.setHex(active ? 0xffffff : obj.baseColor);
-      obj.mesh.scale.setScalar(active ? 1.8 : 1);
+      obj.mesh.scale.setScalar(active ? 2.0 : 1);
+      if (active) activeQuake = obj.quake;
     });
+    // Spawn ripples only for the focused quake and only if mag is significant
+    if (activeQuake && activeQuake.mag >= RIPPLE_MIN_MAG) {
+      const ripplePos = latLonToPoint(activeQuake.lat, activeQuake.lon, GLOBE_RADIUS + 0.001);
+      spawnRipples(ripplePos, getMagnitudeColor(activeQuake.mag));
+    } else if (!quakeId) {
+      clearRipples();
+    }
     wrapper.querySelectorAll('.quake-item').forEach((item) => {
       const isActive = item.dataset.quakeId === quakeId;
       item.classList.toggle('is-active', isActive);
       const detail = item.querySelector('.quake-item-detail');
       if (detail) {
-        detail.style.maxHeight = isActive ? `${detail.scrollHeight}px` : '0';
+        if (isActive) {
+          // Read scrollHeight while visible to get real content height
+          detail.style.maxHeight = `${detail.scrollHeight}px`;
+          detail.removeAttribute('aria-hidden');
+        } else {
+          detail.style.maxHeight = '0';
+          detail.setAttribute('aria-hidden', 'true');
+        }
       }
     });
     if (scroll && !config.noScroll) {
@@ -459,7 +500,6 @@ async function initScene(globeArea, wrapper, quakes, config) {
   let targetY = 0; let targetX = 0; let spinning = false;
 
   function spinToQuake(quake) {
-    // theta = (lon + 180) * π/180; facing camera requires rotation.y = π/2 - theta
     const theta = (quake.lon + 180) * (Math.PI / 180);
     const rawY = Math.PI / 2 - theta;
     const curr = globeGroup.rotation.y;
@@ -467,7 +507,8 @@ async function initScene(globeArea, wrapper, quakes, config) {
     if (diff > Math.PI) diff -= 2 * Math.PI;
     if (diff < -Math.PI) diff += 2 * Math.PI;
     targetY = curr + diff;
-    targetX = -((quake.lat * Math.PI) / 180) * 0.4;
+    // Cap tilt so the marker stays clearly in frame at high latitudes
+    targetX = Math.max(-0.55, Math.min(0.55, -((quake.lat * Math.PI) / 180) * 0.6));
     spinning = true;
   }
 
@@ -481,7 +522,6 @@ async function initScene(globeArea, wrapper, quakes, config) {
 
   function getMarkerScreenPos(nodeObj) {
     const worldPos = nodeObj.pos.clone().applyMatrix4(globeGroup.matrixWorld);
-    // Only show tooltip when marker is on the camera-facing hemisphere
     if (worldPos.z < 0) return null;
     worldPos.project(camera);
     const canvasW = canvas.clientWidth;
@@ -503,12 +543,16 @@ async function initScene(globeArea, wrapper, quakes, config) {
     }
     tooltip.style.visibility = '';
     tooltip.style.left = `${pos.x}px`;
-    tooltip.style.top = `${pos.y}px`;
+    // Clamp Y so tooltip doesn't clip above the canvas top
+    const minY = (tooltip.offsetHeight || 120) + 24;
+    tooltip.style.top = `${Math.max(minY, pos.y)}px`;
   }
 
   function showTooltip(quake) {
     hideTooltip();
     const magFloor = Math.min(9, Math.floor(quake.mag));
+    const latStr = `${Math.abs(quake.lat).toFixed(2)}°${quake.lat >= 0 ? 'N' : 'S'}`;
+    const lonStr = `${Math.abs(quake.lon).toFixed(2)}°${quake.lon >= 0 ? 'E' : 'W'}`;
     tooltip = document.createElement('div');
     tooltip.className = 'quake-tooltip';
     tooltip.innerHTML = `
@@ -521,6 +565,7 @@ async function initScene(globeArea, wrapper, quakes, config) {
         <span>⬇ ${quake.depth} km depth</span>
         <span>${timeAgo(quake.time)}</span>
       </div>
+      <div class="quake-tooltip-coords">${latStr} ${lonStr}</div>
     `;
     tooltipQuakeId = quake.id;
     tooltip.querySelector('.quake-tooltip-close').addEventListener('click', (e) => {
@@ -528,11 +573,23 @@ async function initScene(globeArea, wrapper, quakes, config) {
       hideTooltip();
     });
     globeArea.append(tooltip);
-    // Trigger transition after paint
     requestAnimationFrame(() => {
       updateTooltipPosition();
       tooltip?.classList.add('is-visible');
     });
+  }
+
+  // ─── Hover state ───
+  let globeHovering = false;
+  let sidebarHovering = false;
+
+  canvas.addEventListener('mouseenter', () => { globeHovering = true; });
+  canvas.addEventListener('mouseleave', () => { globeHovering = false; });
+
+  const panelArea = wrapper.querySelector('.quake-panel-area');
+  if (panelArea) {
+    panelArea.addEventListener('mouseenter', () => { sidebarHovering = true; });
+    panelArea.addEventListener('mouseleave', () => { sidebarHovering = false; });
   }
 
   // ─── Drag to rotate ───
@@ -621,11 +678,10 @@ async function initScene(globeArea, wrapper, quakes, config) {
   canvas.style.cursor = 'grab';
 
   // Panel hover / click
-  function attachPanelListeners() {
+  function attachPanelListeners(onItemClick) {
     wrapper.querySelectorAll('.quake-item').forEach((item) => {
       const { quakeId } = item.dataset;
       const q = nodeObjects.find((n) => n.quake.id === quakeId)?.quake;
-      item.addEventListener('mouseenter', () => { if (quakeId) setHighlight(quakeId); });
       item.addEventListener('click', () => {
         if (q) {
           setHighlight(quakeId, true);
@@ -633,6 +689,7 @@ async function initScene(globeArea, wrapper, quakes, config) {
           showTooltip(q);
           autoSpin = false;
           resumeAutoSpin();
+          onItemClick?.();
         }
       });
     });
@@ -643,7 +700,7 @@ async function initScene(globeArea, wrapper, quakes, config) {
     requestAnimationFrame(animate);
     const now = Date.now();
 
-    if (autoSpin && !dragging && !spinning) globeGroup.rotation.y += 0.0003;
+    if (autoSpin && !dragging && !spinning && !globeHovering) globeGroup.rotation.y += 0.0003;
 
     if (spinning) {
       globeGroup.rotation.y += (targetY - globeGroup.rotation.y) * 0.05;
@@ -653,7 +710,6 @@ async function initScene(globeArea, wrapper, quakes, config) {
       if (doneY && doneX) spinning = false;
     }
 
-    // Track tooltip position against globe rotation
     updateTooltipPosition();
 
     activeRipples.forEach((item) => {
@@ -676,8 +732,6 @@ async function initScene(globeArea, wrapper, quakes, config) {
     renderer.render(scene, camera);
   }
 
-  // ResizeObserver fires on first observe (corrects initial flex-layout sizing)
-  // and on every subsequent resize — replaces the window resize listener
   new ResizeObserver(() => {
     const nw = globeArea.clientWidth;
     const nh = globeArea.clientHeight;
@@ -695,9 +749,10 @@ async function initScene(globeArea, wrapper, quakes, config) {
     spinToQuake: (q) => spinToQuake(q),
     setHighlight: (quakeId, scroll) => setHighlight(quakeId, scroll),
     setAutoSpin: (val) => { autoSpin = val; },
-    refreshPanel: () => attachPanelListeners(),
+    refreshPanel: (onItemClick) => attachPanelListeners(onItemClick),
     showTooltip: (q) => showTooltip(q),
     hideTooltip: () => hideTooltip(),
+    isHovering: () => globeHovering || sidebarHovering,
     dispose: () => renderer.dispose(),
   };
 }
@@ -751,17 +806,75 @@ export default async function decorate(block) {
     panelArea.className = 'quake-panel-area';
     wrapper.append(panelArea);
 
-    // Force sync layout so globeArea.clientWidth reflects flex computation
     // eslint-disable-next-line no-unused-expressions
     globeArea.offsetWidth;
 
     const ctrl = await initScene(globeArea, wrapper, quakes, config);
 
+    // ── Cycle management ──────────────────────────────────────────────────
+    let cycleIdx = 0;
+    let cycleHandle = null;
+    let cycleUserPauseTimer = null;
+    let cyclePaused = false;
+
+    const getSorted = () => quakes.slice(0, 10).sort((a, b) => b.mag - a.mag);
+
+    const doCycle = () => {
+      if (ctrl.isHovering() || cyclePaused) return;
+      const sorted = getSorted();
+      if (!sorted.length) return;
+      const q = sorted[cycleIdx % sorted.length];
+      ctrl.spinToQuake(q);
+      ctrl.setHighlight(q.id);
+      ctrl.showTooltip(q);
+      cycleIdx += 1;
+    };
+
+    function scheduleCycle() {
+      clearTimeout(cycleHandle);
+      cycleHandle = setTimeout(() => {
+        doCycle();
+        cycleHandle = setTimeout(function loop() {
+          doCycle();
+          cycleHandle = setTimeout(loop, CYCLE_PAUSE_MS);
+        }, CYCLE_PAUSE_MS);
+      }, CYCLE_DELAY_MS);
+    }
+
+    // Called when user directly interacts — pauses cycle for 10s then resumes
+    function interruptCycle() {
+      clearTimeout(cycleHandle);
+      clearTimeout(cycleUserPauseTimer);
+      if (!cyclePaused) {
+        cycleUserPauseTimer = setTimeout(() => {
+          if (!cyclePaused) scheduleCycle();
+        }, 10000);
+      }
+    }
+
     const replacePanel = (list, isDemo, newId = null) => {
       const old = panelArea.querySelector('.quake-panel');
       const next = buildPanel(list, isDemo, newId);
       if (old) old.replaceWith(next); else panelArea.append(next);
-      ctrl.refreshPanel();
+
+      // Wire up pause/resume button
+      const cycleBtn = panelArea.querySelector('.quake-cycle-btn');
+      if (cycleBtn) {
+        cycleBtn.addEventListener('click', () => {
+          cyclePaused = !cyclePaused;
+          cycleBtn.textContent = cyclePaused ? '▶' : '⏸';
+          cycleBtn.setAttribute('title', cyclePaused ? 'Resume auto-cycle' : 'Pause auto-cycle');
+          cycleBtn.setAttribute('aria-label', cyclePaused ? 'Resume auto-cycle' : 'Pause auto-cycle');
+          if (cyclePaused) {
+            clearTimeout(cycleHandle);
+            clearTimeout(cycleUserPauseTimer);
+          } else {
+            scheduleCycle();
+          }
+        });
+      }
+
+      ctrl.refreshPanel(interruptCycle);
     };
 
     replacePanel(quakes, demo);
@@ -786,29 +899,6 @@ export default async function decorate(block) {
     }
 
     // ── Live mode ──────────────────────────────────────────────────────────
-    let cycleIdx = 0;
-    const getSorted = () => quakes.slice(0, 10).sort((a, b) => b.mag - a.mag);
-
-    const doCycle = () => {
-      const sorted = getSorted();
-      if (!sorted.length) return;
-      const q = sorted[cycleIdx % sorted.length];
-      ctrl.spinToQuake(q);
-      ctrl.setHighlight(q.id);
-      ctrl.showTooltip(q);
-      cycleIdx += 1;
-    };
-
-    let cycleHandle = null;
-    const scheduleCycle = () => {
-      cycleHandle = setTimeout(() => {
-        doCycle();
-        cycleHandle = setTimeout(function loop() {
-          doCycle();
-          cycleHandle = setTimeout(loop, CYCLE_PAUSE_MS);
-        }, CYCLE_PAUSE_MS);
-      }, CYCLE_DELAY_MS);
-    };
     scheduleCycle();
 
     // ── Live polling ──────────────────────────────────────────────────────
@@ -832,7 +922,7 @@ export default async function decorate(block) {
       if (document.hidden) {
         clearTimeout(cycleHandle);
       } else {
-        scheduleCycle();
+        if (!cyclePaused) scheduleCycle();
       }
     }, { once: false });
   } catch (err) {
