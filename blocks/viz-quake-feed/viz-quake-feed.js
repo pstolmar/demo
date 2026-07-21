@@ -123,26 +123,29 @@ function createTerrainTexture(THREE) {
 }
 
 // ─── Parse block config ──────────────────────────────────────────────────
-// Handles both DA Live (block > row > cell) and UE (block > wrapper > row > cell)
+// Works with both DA Live (block > row > cell) and UE (block > wrapper > row > cell)
+// by processing both selector depths; rows without exactly 2 cell children are skipped.
 function parseBlock(block) {
   const cfg = {};
-  // Detect which nesting level has key/value row pairs
-  let rows = [...block.querySelectorAll(':scope > div > div')];
-  if (!rows.some((r) => r.querySelectorAll(':scope > div').length >= 2)) {
-    rows = [...block.querySelectorAll(':scope > div')];
-  }
-  rows.forEach((row) => {
+  const applyRow = (row) => {
     const cells = [...row.querySelectorAll(':scope > div')];
     if (cells.length < 2) return;
-    const key = cells[0].textContent.trim().toLowerCase().replace(/[\s-]+/g, '');
+    const key = cells[0].textContent.trim().toLowerCase().replace(/[\s\-_]+/g, '');
     const val = cells[1].textContent.trim();
     if (!val) return;
     if (key === 'height') { cfg.height = val; return; }
-    if (key === 'minmag') { cfg.minMag = parseFloat(val); return; }
+    if (key === 'minmag') {
+      const parsed = parseFloat(val);
+      if (!Number.isNaN(parsed)) cfg.minMag = parsed;
+      return;
+    }
     if (val.startsWith('{')) {
       try { Object.assign(cfg, JSON.parse(val)); } catch { /* skip */ }
     }
-  });
+  };
+  // Try both depths — safe because non-matching rows (wrong cell count) are skipped
+  block.querySelectorAll(':scope > div > div').forEach(applyRow);
+  block.querySelectorAll(':scope > div').forEach(applyRow);
   return cfg;
 }
 
@@ -397,13 +400,15 @@ async function initScene(globeArea, wrapper, quakes, config) {
   scene.add(new THREE.AmbientLight(0x4a4a5e, 0.6));
 
   // ─── lat/lon → 3D point ───
+  // Matches Three.js IcosahedronGeometry UV: u = 0.5 + atan2(z, x)/(2π)
+  // so Prime Meridian (lon=0°) sits at +x, 90°E at +z, 90°W at -z.
   function latLonToPoint(lat, lon, r = GLOBE_RADIUS) {
     const phi = (90 - lat) * (Math.PI / 180);
     const theta = (lon + 180) * (Math.PI / 180);
     return new THREE.Vector3(
       -r * Math.sin(phi) * Math.cos(theta),
       r * Math.cos(phi),
-      r * Math.sin(phi) * Math.sin(theta),
+      -r * Math.sin(phi) * Math.sin(theta),
     );
   }
 
@@ -501,7 +506,8 @@ async function initScene(globeArea, wrapper, quakes, config) {
 
   function spinToQuake(quake) {
     const theta = (quake.lon + 180) * (Math.PI / 180);
-    const rawY = Math.PI / 2 - theta;
+    // rawY = theta + π/2 derived from z-flipped latLonToPoint: sin(rotY - theta) = 1
+    const rawY = theta + Math.PI / 2;
     const curr = globeGroup.rotation.y;
     let diff = (rawY - curr) % (2 * Math.PI);
     if (diff > Math.PI) diff -= 2 * Math.PI;
